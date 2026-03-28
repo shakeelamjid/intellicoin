@@ -1,8 +1,7 @@
 """
 IntelliCoin Scanner
 Gate-based ranking: S / A / B / C / Rejected
-Runs every hour via GitHub Actions
-Auto-fetches a free working proxy at runtime to bypass Binance 451 US block
+Auto-fetches a free working proxy to bypass Binance 451 US block
 """
 import os, time, random, requests
 from datetime import datetime, timezone
@@ -17,75 +16,62 @@ BINANCE_ENDPOINTS = [
     "https://fapi1.binance.com",
     "https://fapi2.binance.com",
     "https://fapi3.binance.com",
-    "https://fapi4.binance.com",
 ]
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 # ─── Proxy setup ──────────────────────────────────────────────────────────────
 
 def get_working_proxy():
-    """
-    Fetch a fresh proxy from Proxifly (updated every 5 minutes, no auth needed).
-    Tests each proxy against Binance until one works.
-    Falls back to manual HTTPS_PROXY env var if set.
-    """
-    # First check if manual proxy is set
+    # Check manual proxy first
     manual = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
     if manual:
-        print(f"Using manual proxy from env: {manual[:30]}...")
+        print(f"Using manual proxy: {manual[:30]}...")
         return {"https": manual, "http": manual}
 
-    print("Fetching fresh proxy list from Proxifly...")
+    print("Auto-fetching proxy list...")
     try:
-        # Proxifly free proxy list - updated every 5 minutes, no auth required
         r = requests.get(
             "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.json",
-            timeout=10,
+            timeout=8,
         )
         proxies = r.json()
-
-        # Filter to non-US proxies (avoid getting another US IP which is also blocked)
+        # Prefer non-US proxies
         non_us = [p for p in proxies if p.get("country") not in ("US", "United States")]
-        candidates = non_us if non_us else proxies
+        pool = non_us if len(non_us) > 5 else proxies
+        random.shuffle(pool)
 
-        # Shuffle and try up to 20
-        random.shuffle(candidates)
-        for candidate in candidates[:20]:
-            ip   = candidate.get("ip")
-            port = candidate.get("port")
+        # Test max 8 proxies with 3 second timeout each = max 24 seconds
+        for p in pool[:8]:
+            ip   = p.get("ip")
+            port = p.get("port")
             if not ip or not port:
                 continue
-            proxy_str = f"http://{ip}:{port}"
+            proxy_str  = f"http://{ip}:{port}"
             proxy_dict = {"https": proxy_str, "http": proxy_str}
-
-            # Test this proxy against Binance
             try:
                 test = requests.get(
                     "https://fapi.binance.com/fapi/v1/ping",
                     proxies=proxy_dict,
-                    timeout=6,
+                    timeout=3,
                     headers=HEADERS,
                 )
                 if test.status_code == 200:
-                    print(f"✓ Working proxy found: {ip}:{port} ({candidate.get('country','?')})")
+                    print(f"✓ Proxy found: {ip}:{port} ({p.get('country','?')})")
                     return proxy_dict
             except:
                 continue
 
-        print("No working proxy found from Proxifly list — trying without proxy")
-        return None
-
     except Exception as e:
-        print(f"Could not fetch proxy list: {e}")
-        return None
+        print(f"Proxy fetch failed: {e}")
+
+    print("No proxy found — proceeding without proxy")
+    return None
 
 
 # ─── HTTP helper ──────────────────────────────────────────────────────────────
 
-PROXIES = None  # set in run()
+PROXIES = None
 
 def get(path, params={}):
     last_error = None
@@ -99,7 +85,7 @@ def get(path, params={}):
                 proxies=PROXIES,
             )
             if r.status_code == 451:
-                last_error = f"451 blocked on {base}"
+                last_error = f"451 on {base}"
                 continue
             r.raise_for_status()
             time.sleep(0.04)
@@ -191,18 +177,17 @@ def calc_adx(klines, period=14):
         for i in range(1, len(klines)):
             tr  = max(H[i]-L[i], abs(H[i]-C[i-1]), abs(L[i]-C[i-1]))
             pdm = max(H[i]-H[i-1], 0) if H[i]-H[i-1] > L[i-1]-L[i] else 0
-            ndm = max(L[i-1]-L[i], 0) if L[i-1]-L[i] > H[i]-H[i-1] else 0
+            ndm = max(L[i-1]-L[i], 0) if L[i-1]-L[i] > H[i]-H[i-1]  else 0
             tr_l.append(tr); pdm_l.append(pdm); ndm_l.append(ndm)
         def smooth(lst):
             s = sum(lst[:period]); res = [s]
             for v in lst[period:]: s = s - s/period + v; res.append(s)
             return res
-        at = smooth(tr_l); pd = smooth(pdm_l); nd = smooth(ndm_l)
-        dx = []
+        at=smooth(tr_l); pd=smooth(pdm_l); nd=smooth(ndm_l); dx=[]
         for a, p, n in zip(at, pd, nd):
             if a == 0: continue
-            pi = 100*p/a; ni = 100*n/a
-            dx.append(100*abs(pi-ni)/(pi+ni) if (pi+ni) != 0 else 0)
+            pi=100*p/a; ni=100*n/a
+            dx.append(100*abs(pi-ni)/(pi+ni) if (pi+ni)!=0 else 0)
         return sum(dx[-period:]) / period if dx else None
     except: return None
 
@@ -222,11 +207,11 @@ SCENARIO_DIRECTION = {
 }
 
 def classify(pc, oi, vol, fr):
-    up = pc > 1.5; dn = pc < -1.5; fl = not up and not dn
-    oiU = oi  is not None and oi  >  3;  oiD = oi  is not None and oi  < -3
-    vH  = vol is not None and vol >  1.5; vL  = vol is not None and vol <  0.7
-    fhP = fr  is not None and fr  >  0.0008; fhN = fr is not None and fr < -0.0008
-    fxP = fr  is not None and fr  >  0.002;  fxN = fr is not None and fr < -0.002
+    up=pc>1.5; dn=pc<-1.5; fl=not up and not dn
+    oiU=oi  is not None and oi  >  3; oiD=oi  is not None and oi  < -3
+    vH =vol is not None and vol >  1.5; vL=vol is not None and vol < 0.7
+    fhP=fr  is not None and fr  >  0.0008; fhN=fr is not None and fr < -0.0008
+    fxP=fr  is not None and fr  >  0.002;  fxN=fr is not None and fr < -0.002
     if up and oiU and vH and not fxP: return 1
     if dn and oiU and vH and not fxN: return 2
     if up and oiD and vL and fhP:     return 3
@@ -246,15 +231,14 @@ def assign_rank(scenario, adx, oi_chg, vol_ratio, fr, bybit_chg=None):
     if scenario == 9:  return 'C'
     direction = SCENARIO_DIRECTION.get(scenario)
     if not direction: return None
-    fr = fr or 0; oi = oi_chg or 0; vol = vol_ratio or 0; adx_v = adx or 0
-    fr_opp = (direction == 'long' and fr > 0.002) or (direction == 'short' and fr < -0.002)
+    fr=fr or 0; oi=oi_chg or 0; vol=vol_ratio or 0; adx_v=adx or 0
+    fr_opp = (direction=='long' and fr>0.002) or (direction=='short' and fr<-0.002)
     bybit_ok = bybit_chg is not None and (
-        (direction == 'long' and bybit_chg > 1.5) or
-        (direction == 'short' and bybit_chg < -1.5)
+        (direction=='long' and bybit_chg>1.5) or (direction=='short' and bybit_chg<-1.5)
     )
-    if adx_v > 30 and abs(oi) > 8 and vol > 2.0 and bybit_ok:          return 'S'
-    if adx_v > 22 and abs(oi) > 4 and vol > 1.5 and not fr_opp:        return 'A'
-    if 1 <= scenario <= 8 and (abs(oi) > 2 or vol > 1.2) and not fr_opp: return 'B'
+    if adx_v>30 and abs(oi)>8 and vol>2.0 and bybit_ok:              return 'S'
+    if adx_v>22 and abs(oi)>4 and vol>1.5 and not fr_opp:            return 'A'
+    if 1<=scenario<=8 and (abs(oi)>2 or vol>1.2) and not fr_opp:     return 'B'
     return None
 
 
@@ -316,7 +300,6 @@ def run():
     print(f"IntelliCoin Scanner — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*60}\n")
 
-    # Auto-fetch working proxy
     PROXIES = get_working_proxy()
     print()
 
@@ -331,8 +314,7 @@ def run():
     created = 0
 
     for symbol in symbols:
-        if symbol in blacklisted:
-            continue
+        if symbol in blacklisted: continue
         try:
             ticker    = get_ticker(symbol)
             price     = sf(ticker.get("lastPrice"))
