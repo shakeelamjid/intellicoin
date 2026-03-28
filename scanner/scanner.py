@@ -1,10 +1,10 @@
 """
 IntelliCoin Scanner
 Gate-based ranking: S / A / B / C / Rejected
-Runs every hour via GitHub Actions at :05 past
-Uses proxy to bypass Binance US IP restrictions (451 block)
+Runs every hour via GitHub Actions
+Auto-fetches a free working proxy at runtime to bypass Binance 451 US block
 """
-import os, time, requests
+import os, time, random, requests
 from datetime import datetime, timezone
 from supabase import create_client
 
@@ -24,16 +24,68 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 }
 
-_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY") or None
-PROXIES = {"https": _proxy, "http": _proxy} if _proxy else None
+# ─── Proxy setup ──────────────────────────────────────────────────────────────
 
-if PROXIES:
-    print(f"Using proxy: {_proxy[:30]}...")
-else:
-    print("No proxy — trying all Binance endpoints directly")
+def get_working_proxy():
+    """
+    Fetch a fresh proxy from Proxifly (updated every 5 minutes, no auth needed).
+    Tests each proxy against Binance until one works.
+    Falls back to manual HTTPS_PROXY env var if set.
+    """
+    # First check if manual proxy is set
+    manual = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if manual:
+        print(f"Using manual proxy from env: {manual[:30]}...")
+        return {"https": manual, "http": manual}
+
+    print("Fetching fresh proxy list from Proxifly...")
+    try:
+        # Proxifly free proxy list - updated every 5 minutes, no auth required
+        r = requests.get(
+            "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.json",
+            timeout=10,
+        )
+        proxies = r.json()
+
+        # Filter to non-US proxies (avoid getting another US IP which is also blocked)
+        non_us = [p for p in proxies if p.get("country") not in ("US", "United States")]
+        candidates = non_us if non_us else proxies
+
+        # Shuffle and try up to 20
+        random.shuffle(candidates)
+        for candidate in candidates[:20]:
+            ip   = candidate.get("ip")
+            port = candidate.get("port")
+            if not ip or not port:
+                continue
+            proxy_str = f"http://{ip}:{port}"
+            proxy_dict = {"https": proxy_str, "http": proxy_str}
+
+            # Test this proxy against Binance
+            try:
+                test = requests.get(
+                    "https://fapi.binance.com/fapi/v1/ping",
+                    proxies=proxy_dict,
+                    timeout=6,
+                    headers=HEADERS,
+                )
+                if test.status_code == 200:
+                    print(f"✓ Working proxy found: {ip}:{port} ({candidate.get('country','?')})")
+                    return proxy_dict
+            except:
+                continue
+
+        print("No working proxy found from Proxifly list — trying without proxy")
+        return None
+
+    except Exception as e:
+        print(f"Could not fetch proxy list: {e}")
+        return None
 
 
-# ─── helpers ──────────────────────────────────────────────────────────────────
+# ─── HTTP helper ──────────────────────────────────────────────────────────────
+
+PROXIES = None  # set in run()
 
 def get(path, params={}):
     last_error = None
@@ -48,7 +100,6 @@ def get(path, params={}):
             )
             if r.status_code == 451:
                 last_error = f"451 blocked on {base}"
-                print(f"  451 on {base} — trying next...")
                 continue
             r.raise_for_status()
             time.sleep(0.04)
@@ -69,7 +120,7 @@ def sf(v):
     except: return None
 
 
-# ─── data fetchers ─────────────────────────────────────────────────────────────
+# ─── Data fetchers ────────────────────────────────────────────────────────────
 
 def get_all_symbols():
     info = get("/fapi/v1/exchangeInfo")
@@ -80,27 +131,22 @@ def get_all_symbols():
         and s["status"] == "TRADING"
     ]
 
-
 def get_ticker(symbol):
     return get("/fapi/v1/ticker/24hr", {"symbol": symbol})
-
 
 def get_klines(symbol, limit=26):
     try: return get("/fapi/v1/klines", {"symbol": symbol, "interval": "1h", "limit": limit})
     except: return []
 
-
 def get_oi_history(symbol):
     try: return get("/futures/data/openInterestHist", {"symbol": symbol, "period": "1h", "limit": 6})
     except: return []
-
 
 def get_funding(symbol):
     try:
         d = get("/fapi/v1/fundingRate", {"symbol": symbol, "limit": 1})
         return sf(d[0]["fundingRate"]) if d else None
     except: return None
-
 
 def get_bybit_ticker(symbol):
     try:
@@ -117,16 +163,15 @@ def get_bybit_ticker(symbol):
     except: return None
 
 
-# ─── indicators ────────────────────────────────────────────────────────────────
+# ─── Indicators ───────────────────────────────────────────────────────────────
 
 def calc_oi_change(oi_hist):
     try:
         if len(oi_hist) < 2: return None
         old = float(oi_hist[0]["sumOpenInterest"])
-        new = float(oi_hist[-1]["sumOpenInterest"])
-        return ((new - old) / old * 100) if old > 0 else None
+        nw  = float(oi_hist[-1]["sumOpenInterest"])
+        return ((nw - old) / old * 100) if old > 0 else None
     except: return None
-
 
 def calc_volume_ratio(klines):
     try:
@@ -136,35 +181,33 @@ def calc_volume_ratio(klines):
         return vols[-1] / avg if avg > 0 else None
     except: return None
 
-
 def calc_adx(klines, period=14):
     try:
         if len(klines) < period + 1: return None
-        highs  = [float(k[2]) for k in klines]
-        lows   = [float(k[3]) for k in klines]
-        closes = [float(k[4]) for k in klines]
+        H = [float(k[2]) for k in klines]
+        L = [float(k[3]) for k in klines]
+        C = [float(k[4]) for k in klines]
         tr_l, pdm_l, ndm_l = [], [], []
         for i in range(1, len(klines)):
-            tr  = max(highs[i]-lows[i], abs(highs[i]-closes[i-1]), abs(lows[i]-closes[i-1]))
-            pdm = max(highs[i]-highs[i-1], 0) if highs[i]-highs[i-1] > lows[i-1]-lows[i] else 0
-            ndm = max(lows[i-1]-lows[i], 0)   if lows[i-1]-lows[i] > highs[i]-highs[i-1]  else 0
+            tr  = max(H[i]-L[i], abs(H[i]-C[i-1]), abs(L[i]-C[i-1]))
+            pdm = max(H[i]-H[i-1], 0) if H[i]-H[i-1] > L[i-1]-L[i] else 0
+            ndm = max(L[i-1]-L[i], 0) if L[i-1]-L[i] > H[i]-H[i-1] else 0
             tr_l.append(tr); pdm_l.append(pdm); ndm_l.append(ndm)
         def smooth(lst):
             s = sum(lst[:period]); res = [s]
             for v in lst[period:]: s = s - s/period + v; res.append(s)
             return res
-        atr_s = smooth(tr_l); pdm_s = smooth(pdm_l); ndm_s = smooth(ndm_l)
-        dx_l = []
-        for a, p, n in zip(atr_s, pdm_s, ndm_s):
+        at = smooth(tr_l); pd = smooth(pdm_l); nd = smooth(ndm_l)
+        dx = []
+        for a, p, n in zip(at, pd, nd):
             if a == 0: continue
-            pdi = 100*p/a; ndi = 100*n/a
-            dx = 100*abs(pdi-ndi)/(pdi+ndi) if (pdi+ndi) != 0 else 0
-            dx_l.append(dx)
-        return sum(dx_l[-period:]) / period if dx_l else None
+            pi = 100*p/a; ni = 100*n/a
+            dx.append(100*abs(pi-ni)/(pi+ni) if (pi+ni) != 0 else 0)
+        return sum(dx[-period:]) / period if dx else None
     except: return None
 
 
-# ─── scenario classifier ───────────────────────────────────────────────────────
+# ─── Scenario classifier ──────────────────────────────────────────────────────
 
 SCENARIO_NAMES = {
     1:"Strong bull trend", 2:"Strong bear trend", 3:"Weak rally",
@@ -178,87 +221,80 @@ SCENARIO_DIRECTION = {
     9:None,   10:None,
 }
 
-
-def classify(price_chg, oi_chg, vol_ratio, fr):
-    up   = price_chg >  1.5
-    down = price_chg < -1.5
-    flat = not up and not down
-    oi_up   = oi_chg is not None and oi_chg >  3
-    oi_down = oi_chg is not None and oi_chg < -3
-    vol_hi  = vol_ratio is not None and vol_ratio > 1.5
-    vol_lo  = vol_ratio is not None and vol_ratio < 0.7
-    fr_hi_p = fr is not None and fr >  0.0008
-    fr_hi_n = fr is not None and fr < -0.0008
-    fr_ex_p = fr is not None and fr >  0.002
-    fr_ex_n = fr is not None and fr < -0.002
-    if up   and oi_up   and vol_hi and not fr_ex_p: return 1
-    if down and oi_up   and vol_hi and not fr_ex_n: return 2
-    if up   and oi_down and vol_lo and fr_hi_p:     return 3
-    if down and oi_down and vol_lo and fr_hi_n:     return 4
-    if up   and not oi_up and vol_lo and fr_hi_p:   return 5
-    if down and not oi_up and vol_lo and fr_hi_n:   return 6
-    if up   and oi_up   and fr_ex_p:                return 7
-    if down and oi_up   and fr_ex_n:                return 8
-    if flat and oi_up:                              return 9
+def classify(pc, oi, vol, fr):
+    up = pc > 1.5; dn = pc < -1.5; fl = not up and not dn
+    oiU = oi  is not None and oi  >  3;  oiD = oi  is not None and oi  < -3
+    vH  = vol is not None and vol >  1.5; vL  = vol is not None and vol <  0.7
+    fhP = fr  is not None and fr  >  0.0008; fhN = fr is not None and fr < -0.0008
+    fxP = fr  is not None and fr  >  0.002;  fxN = fr is not None and fr < -0.002
+    if up and oiU and vH and not fxP: return 1
+    if dn and oiU and vH and not fxN: return 2
+    if up and oiD and vL and fhP:     return 3
+    if dn and oiD and vL and fhN:     return 4
+    if up and not oiU and vL and fhP: return 5
+    if dn and not oiU and vL and fhN: return 6
+    if up and oiU and fxP:            return 7
+    if dn and oiU and fxN:            return 8
+    if fl and oiU:                    return 9
     return 10
 
 
-# ─── gate-based ranker ─────────────────────────────────────────────────────────
+# ─── Gate-based ranker ────────────────────────────────────────────────────────
 
 def assign_rank(scenario, adx, oi_chg, vol_ratio, fr, bybit_chg=None):
     if scenario == 10: return None
     if scenario == 9:  return 'C'
     direction = SCENARIO_DIRECTION.get(scenario)
-    if direction is None: return None
+    if not direction: return None
     fr = fr or 0; oi = oi_chg or 0; vol = vol_ratio or 0; adx_v = adx or 0
-    fr_opposing = (direction == 'long' and fr > 0.002) or (direction == 'short' and fr < -0.002)
-    bybit_confirms = False
-    if bybit_chg is not None:
-        bybit_confirms = (direction == 'long' and bybit_chg > 1.5) or (direction == 'short' and bybit_chg < -1.5)
-    if adx_v > 30 and abs(oi) > 8 and vol > 2.0 and bybit_confirms: return 'S'
-    if adx_v > 22 and abs(oi) > 4 and vol > 1.5 and not fr_opposing: return 'A'
-    if scenario in range(1, 9) and (abs(oi) > 2 or vol > 1.2) and not fr_opposing: return 'B'
+    fr_opp = (direction == 'long' and fr > 0.002) or (direction == 'short' and fr < -0.002)
+    bybit_ok = bybit_chg is not None and (
+        (direction == 'long' and bybit_chg > 1.5) or
+        (direction == 'short' and bybit_chg < -1.5)
+    )
+    if adx_v > 30 and abs(oi) > 8 and vol > 2.0 and bybit_ok:          return 'S'
+    if adx_v > 22 and abs(oi) > 4 and vol > 1.5 and not fr_opp:        return 'A'
+    if 1 <= scenario <= 8 and (abs(oi) > 2 or vol > 1.2) and not fr_opp: return 'B'
     return None
 
 
-# ─── trade setup builder ───────────────────────────────────────────────────────
+# ─── Trade setup builder ──────────────────────────────────────────────────────
 
 def build_setup(direction, price, klines):
     try:
         atrs = []
         for i in range(1, min(15, len(klines))):
-            h = float(klines[i][2]); l = float(klines[i][3]); pc = float(klines[i-1][4])
+            h=float(klines[i][2]); l=float(klines[i][3]); pc=float(klines[i-1][4])
             atrs.append(max(h-l, abs(h-pc), abs(l-pc)))
-        atr = sum(atrs)/len(atrs) if atrs else price*0.02
-        recent  = klines[-10:]
-        swing_h = max(float(k[2]) for k in recent)
-        swing_l = min(float(k[3]) for k in recent)
+        atr    = sum(atrs)/len(atrs) if atrs else price*0.02
+        recent = klines[-10:]
+        sH = max(float(k[2]) for k in recent)
+        sL = min(float(k[3]) for k in recent)
         if direction == "long":
-            el = round(price*0.999, 8); eh = round(price*1.002, 8)
-            sl = round(min(swing_l, price-1.5*atr), 8)
-            risk = max(el-sl, price*0.005)
-            tp1 = round(eh+risk*1.5, 8); tp2 = round(eh+risk*3.0, 8); tp3 = round(eh+risk*5.0, 8)
+            el=price*0.999; eh=price*1.002
+            sl=min(sL, price-1.5*atr); risk=max(el-sl, price*0.005)
+            tp1=eh+risk*1.5; tp2=eh+risk*3; tp3=eh+risk*5
         else:
-            el = round(price*0.998, 8); eh = round(price*1.001, 8)
-            sl = round(max(swing_h, price+1.5*atr), 8)
-            risk = max(sl-eh, price*0.005)
-            tp1 = round(el-risk*1.5, 8); tp2 = round(el-risk*3.0, 8); tp3 = round(el-risk*5.0, 8)
-        rr = round(abs(tp2-eh)/abs(sl-el), 2) if risk > 0 else 2.0
-        atr_pct = (atr/price)*100
-        lev = 3 if atr_pct > 3 else 5 if atr_pct > 2 else 7 if atr_pct > 1 else 10
-        return {"entry_low":el,"entry_high":eh,"stop_loss":sl,"tp1":tp1,"tp2":tp2,"tp3":tp3,"rr_ratio":rr,"suggested_leverage":lev}
+            el=price*0.998; eh=price*1.001
+            sl=max(sH, price+1.5*atr); risk=max(sl-eh, price*0.005)
+            tp1=el-risk*1.5; tp2=el-risk*3; tp3=el-risk*5
+        rr  = round(abs(tp2-eh)/abs(sl-el), 2) if risk > 0 else 2.0
+        pct = (atr/price)*100
+        lev = 3 if pct>3 else 5 if pct>2 else 7 if pct>1 else 10
+        return {"entry_low":el,"entry_high":eh,"stop_loss":sl,
+                "tp1":tp1,"tp2":tp2,"tp3":tp3,"rr_ratio":rr,"suggested_leverage":lev}
     except:
-        return {"entry_low":price,"entry_high":price,"stop_loss":price,"tp1":price,"tp2":price,"tp3":price,"rr_ratio":0,"suggested_leverage":3}
+        return {"entry_low":price,"entry_high":price,"stop_loss":price,
+                "tp1":price,"tp2":price,"tp3":price,"rr_ratio":0,"suggested_leverage":3}
 
 
-# ─── config & status ───────────────────────────────────────────────────────────
+# ─── Config & status ──────────────────────────────────────────────────────────
 
 def get_config():
     try:
         res = supabase.table("scanner_config").select("*").limit(1).execute()
         return res.data[0] if res.data else {}
     except: return {}
-
 
 def update_status(status, count=0):
     try:
@@ -271,12 +307,18 @@ def update_status(status, count=0):
         print(f"  Could not update scanner status: {e}")
 
 
-# ─── main ──────────────────────────────────────────────────────────────────────
+# ─── Main ─────────────────────────────────────────────────────────────────────
 
 def run():
+    global PROXIES
+
     print(f"\n{'='*60}")
     print(f"IntelliCoin Scanner — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"{'='*60}\n")
+
+    # Auto-fetch working proxy
+    PROXIES = get_working_proxy()
+    print()
 
     config      = get_config()
     enabled     = set(config.get("enabled_scenarios", list(range(1, 11))))
@@ -305,14 +347,13 @@ def run():
             adx       = calc_adx(klines)
 
             scenario  = classify(price_chg, oi_chg, vol_ratio, fr)
-            if scenario not in enabled: continue
-            if scenario == 10: continue
+            if scenario not in enabled or scenario == 10: continue
 
             direction = SCENARIO_DIRECTION.get(scenario)
             bybit     = get_bybit_ticker(symbol)
             bybit_chg = bybit["price_chg_pct"] if bybit else None
             rank      = assign_rank(scenario, adx, oi_chg, vol_ratio, fr, bybit_chg)
-            if rank is None: continue
+            if not rank: continue
 
             setup = build_setup(direction, price, klines) if direction else {
                 "entry_low":price,"entry_high":price,"stop_loss":price,
