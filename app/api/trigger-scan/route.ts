@@ -10,8 +10,35 @@ export async function POST() {
   }
 
   try {
+    // First get the workflow ID
+    const listRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    )
+    const listData = await listRes.json()
+    const workflows = listData.workflows || []
+    
+    // Find scanner workflow
+    const workflow = workflows.find((w: any) => 
+      w.path.includes('scanner') || w.name.toLowerCase().includes('scanner')
+    )
+    
+    if (!workflow) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: `No scanner workflow found. Available: ${workflows.map((w: any) => w.path).join(', ')}` 
+      }, { status: 404 })
+    }
+
+    // Trigger it
     const res = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/scanner.yml/dispatches`,
+      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow.id}/dispatches`,
       {
         method: 'POST',
         headers: {
