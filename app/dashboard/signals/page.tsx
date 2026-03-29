@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const F = "'Helvetica Neue', Helvetica, Arial, sans-serif"
@@ -46,6 +46,61 @@ function fp(n: number | null) {
   if (n >= 1)    return '$' + n.toFixed(3)
   if (n >= 0.01) return '$' + n.toFixed(5)
   return '$' + n.toFixed(7)
+}
+
+
+// ── TradingView Widget ─────────────────────────────────────────────────────────
+function TradingViewWidget({ symbol, interval }: { symbol: string; interval: string }) {
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!containerRef.current) return
+    containerRef.current.innerHTML = ''
+
+    const script = document.createElement('script')
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
+    script.type = 'text/javascript'
+    script.async = true
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: `BINANCE:${symbol}.P`,
+      interval: interval,
+      timezone: 'Etc/UTC',
+      theme: 'dark',
+      style: '1',
+      locale: 'en',
+      enable_publishing: false,
+      backgroundColor: '#0f1220',
+      gridColor: 'rgba(255,255,255,0.05)',
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      calendar: false,
+      support_host: 'https://www.tradingview.com',
+    })
+
+    const container = document.createElement('div')
+    container.className = 'tradingview-widget-container__widget'
+    container.style.height = '100%'
+    container.style.width = '100%'
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'tradingview-widget-container'
+    wrapper.style.height = '500px'
+    wrapper.style.width = '100%'
+    wrapper.appendChild(container)
+    wrapper.appendChild(script)
+
+    containerRef.current.appendChild(wrapper)
+
+    return () => {
+      if (containerRef.current) containerRef.current.innerHTML = ''
+    }
+  }, [symbol, interval])
+
+  return (
+    <div ref={containerRef} style={{width:'100%', height:'500px', background:'#0f1220'}} />
+  )
 }
 
 // ── Chart Modal ────────────────────────────────────────────────────────────────
@@ -131,14 +186,9 @@ function ChartModal({ signal, onClose }: { signal: any; onClose: () => void }) {
           ))}
         </div>
 
-        {/* TradingView chart */}
-        <div style={{flex:1, minHeight:'500px'}}>
-          <iframe
-            key={sym}
-            src={`https://www.tradingview.com/widgetsnippet/symbol-overview/?symbols=BINANCE:${sym}.P&interval=${tvTf}&theme=dark&style=1&locale=en&toolbar_bg=%230f1220&enable_publishing=false&hide_top_toolbar=false&hide_legend=false&save_image=false&container_id=tv_chart`}
-            style={{width:'100%', height:'100%', border:'none', minHeight:'500px'}}
-            allowFullScreen
-          />
+        {/* TradingView chart — official widget */}
+        <div style={{flex:1, minHeight:'500px', position:'relative'}} id={`tv-${sym}`}>
+          <TradingViewWidget symbol={sym} interval={tvTf} />
         </div>
 
         {/* Footer indicators */}
