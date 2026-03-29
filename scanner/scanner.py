@@ -1,7 +1,7 @@
 """
-IntelliCoin Scanner
-Gate-based ranking: S / A / B / C / Rejected
-Uses ProxyScrape verified proxy API to bypass Binance 451 US block
+IntelliCoin Scanner — TOP 50 TEST VERSION
+Scans only top 50 USDT perp pairs by 24h volume
+Gate-based ranking: S / A / B / C
 """
 import os, time, random, requests
 from datetime import datetime, timezone
@@ -23,56 +23,45 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 # ─── Proxy setup ──────────────────────────────────────────────────────────────
 
 def get_working_proxy():
-    # Manual proxy takes priority
     manual = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
     if manual:
         print(f"Using manual proxy: {manual[:40]}...")
         return {"https": manual, "http": manual}
 
-    # Try multiple proxy sources
     sources = [
-        # ProxyScrape - returns only verified working proxies, filtered to non-US
         "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=3000&country=DE,NL,FR,PL,CZ,RO,HU,BG,UA,RS&anonymity=elite,anonymous&format=text",
         "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=3000&country=all&anonymity=elite,anonymous&format=text",
-        # Backup - raw list
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
     ]
 
     for source_url in sources:
         try:
-            print(f"Fetching proxies from {source_url[:50]}...")
+            print(f"Fetching proxies from {source_url[:60]}...")
             r = requests.get(source_url, timeout=8)
             lines = [l.strip() for l in r.text.strip().split("\n") if ":" in l.strip()]
             if not lines:
                 continue
-
             random.shuffle(lines)
-            print(f"Testing up to 10 proxies from {len(lines)} available...")
-
+            print(f"Testing up to 10 from {len(lines)} proxies...")
             for proxy_str in lines[:10]:
-                proxy_str = proxy_str.strip()
                 if not proxy_str or ":" not in proxy_str:
                     continue
-                # Skip US proxies from TheSpeedX list
                 proxy_dict = {"https": f"http://{proxy_str}", "http": f"http://{proxy_str}"}
                 try:
                     test = requests.get(
                         "https://fapi.binance.com/fapi/v1/ping",
-                        proxies=proxy_dict,
-                        timeout=4,
-                        headers=HEADERS,
+                        proxies=proxy_dict, timeout=4, headers=HEADERS,
                     )
                     if test.status_code == 200:
                         print(f"✓ Working proxy: {proxy_str}")
                         return proxy_dict
                 except:
                     continue
-
         except Exception as e:
             print(f"Source failed: {e}")
             continue
 
-    print("No working proxy found — proceeding without proxy")
+    print("No proxy found — proceeding without proxy")
     return None
 
 
@@ -85,11 +74,8 @@ def get(path, params={}):
     for base in BINANCE_ENDPOINTS:
         try:
             r = requests.get(
-                f"{base}{path}",
-                params=params,
-                timeout=12,
-                headers=HEADERS,
-                proxies=PROXIES,
+                f"{base}{path}", params=params,
+                timeout=12, headers=HEADERS, proxies=PROXIES,
             )
             if r.status_code == 451:
                 last_error = f"451 on {base}"
@@ -98,13 +84,10 @@ def get(path, params={}):
             time.sleep(0.04)
             return r.json()
         except requests.exceptions.HTTPError as e:
-            if "451" in str(e):
-                last_error = f"451 on {base}"
-                continue
+            if "451" in str(e): last_error = f"451 on {base}"; continue
             raise e
         except Exception as e:
-            last_error = str(e)
-            continue
+            last_error = str(e); continue
     raise Exception(f"All Binance endpoints failed. Last: {last_error}")
 
 
@@ -113,16 +96,25 @@ def sf(v):
     except: return None
 
 
-# ─── Data fetchers ────────────────────────────────────────────────────────────
+# ─── Get top 50 symbols by 24h volume ─────────────────────────────────────────
 
-def get_all_symbols():
-    info = get("/fapi/v1/exchangeInfo")
-    return [
-        s["symbol"] for s in info["symbols"]
-        if s["quoteAsset"] == "USDT"
-        and s["contractType"] == "PERPETUAL"
-        and s["status"] == "TRADING"
-    ]
+def get_top_symbols(n=50):
+    """Fetch all 24h tickers and return top N by quoteVolume (USDT volume)"""
+    tickers = get("/fapi/v1/ticker/24hr")
+    # Filter to active USDT perpetuals
+    usdt = [t for t in tickers if t["symbol"].endswith("USDT")]
+    # Sort by quote volume descending
+    usdt.sort(key=lambda t: float(t.get("quoteVolume", 0)), reverse=True)
+    top = usdt[:n]
+    print(f"Top {n} symbols by 24h volume:")
+    for i, t in enumerate(top[:10]):
+        vol_b = float(t["quoteVolume"]) / 1_000_000_000
+        print(f"  {i+1:2}. {t['symbol']:20} ${vol_b:.1f}B")
+    print(f"  ... and {n-10} more")
+    return [t["symbol"] for t in top]
+
+
+# ─── Data fetchers ────────────────────────────────────────────────────────────
 
 def get_ticker(symbol):
     return get("/fapi/v1/ticker/24hr", {"symbol": symbol})
@@ -161,26 +153,25 @@ def get_bybit_ticker(symbol):
 def calc_oi_change(oi_hist):
     try:
         if len(oi_hist) < 2: return None
-        old = float(oi_hist[0]["sumOpenInterest"])
-        nw  = float(oi_hist[-1]["sumOpenInterest"])
-        return ((nw - old) / old * 100) if old > 0 else None
+        old=float(oi_hist[0]["sumOpenInterest"]); nw=float(oi_hist[-1]["sumOpenInterest"])
+        return ((nw-old)/old*100) if old>0 else None
     except: return None
 
 def calc_volume_ratio(klines):
     try:
-        vols = [float(k[5]) for k in klines]
-        if len(vols) < 2: return None
-        avg = sum(vols[:-1]) / len(vols[:-1])
-        return vols[-1] / avg if avg > 0 else None
+        vols=[float(k[5]) for k in klines]
+        if len(vols)<2: return None
+        avg=sum(vols[:-1])/len(vols[:-1])
+        return vols[-1]/avg if avg>0 else None
     except: return None
 
 def calc_adx(klines, period=14):
     try:
-        if len(klines) < period + 1: return None
+        if len(klines)<period+1: return None
         H=[float(k[2]) for k in klines]; L=[float(k[3]) for k in klines]; C=[float(k[4]) for k in klines]
         tr_l,pdm_l,ndm_l=[],[],[]
-        for i in range(1, len(klines)):
-            tr =max(H[i]-L[i],abs(H[i]-C[i-1]),abs(L[i]-C[i-1]))
+        for i in range(1,len(klines)):
+            tr=max(H[i]-L[i],abs(H[i]-C[i-1]),abs(L[i]-C[i-1]))
             pdm=max(H[i]-H[i-1],0) if H[i]-H[i-1]>L[i-1]-L[i] else 0
             ndm=max(L[i-1]-L[i],0) if L[i-1]-L[i]>H[i]-H[i-1]  else 0
             tr_l.append(tr); pdm_l.append(pdm); ndm_l.append(ndm)
@@ -204,11 +195,10 @@ SCENARIO_NAMES = {
     4:"Weak sell-off",     5:"Bull trap",         6:"Bear trap",
     7:"Long squeeze",      8:"Short squeeze",     9:"Coil / buildup", 10:"Disinterest",
 }
-
 SCENARIO_DIRECTION = {
     1:"long", 2:"short", 3:"short", 4:"long",
     5:"short", 6:"long",  7:"short", 8:"long",
-    9:None,   10:None,
+    9:None, 10:None,
 }
 
 def classify(pc, oi, vol, fr):
@@ -232,9 +222,9 @@ def classify(pc, oi, vol, fr):
 # ─── Gate-based ranker ────────────────────────────────────────────────────────
 
 def assign_rank(scenario, adx, oi_chg, vol_ratio, fr, bybit_chg=None):
-    if scenario == 10: return None
-    if scenario == 9:  return 'C'
-    direction = SCENARIO_DIRECTION.get(scenario)
+    if scenario==10: return None
+    if scenario==9:  return 'C'
+    direction=SCENARIO_DIRECTION.get(scenario)
     if not direction: return None
     fr=fr or 0; oi=oi_chg or 0; vol=vol_ratio or 0; adx_v=adx or 0
     fr_opp=(direction=='long' and fr>0.002) or (direction=='short' and fr<-0.002)
@@ -247,12 +237,12 @@ def assign_rank(scenario, adx, oi_chg, vol_ratio, fr, bybit_chg=None):
     return None
 
 
-# ─── Trade setup builder ──────────────────────────────────────────────────────
+# ─── Trade setup ──────────────────────────────────────────────────────────────
 
 def build_setup(direction, price, klines):
     try:
         atrs=[]
-        for i in range(1, min(15, len(klines))):
+        for i in range(1, min(15,len(klines))):
             h=float(klines[i][2]); l=float(klines[i][3]); pc=float(klines[i-1][4])
             atrs.append(max(h-l,abs(h-pc),abs(l-pc)))
         atr=sum(atrs)/len(atrs) if atrs else price*0.02
@@ -265,8 +255,7 @@ def build_setup(direction, price, klines):
             el=price*0.998; eh=price*1.001; sl=max(sH,price+1.5*atr)
             risk=max(sl-eh,price*0.005); tp1=el-risk*1.5; tp2=el-risk*3; tp3=el-risk*5
         rr=round(abs(tp2-eh)/abs(sl-el),2) if risk>0 else 2.0
-        pct=(atr/price)*100
-        lev=3 if pct>3 else 5 if pct>2 else 7 if pct>1 else 10
+        pct=(atr/price)*100; lev=3 if pct>3 else 5 if pct>2 else 7 if pct>1 else 10
         return {"entry_low":el,"entry_high":eh,"stop_loss":sl,
                 "tp1":tp1,"tp2":tp2,"tp3":tp3,"rr_ratio":rr,"suggested_leverage":lev}
     except:
@@ -300,6 +289,7 @@ def run():
 
     print(f"\n{'='*60}")
     print(f"IntelliCoin Scanner — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    print(f"TOP 50 BY VOLUME TEST RUN")
     print(f"{'='*60}\n")
 
     PROXIES = get_working_proxy()
@@ -307,16 +297,17 @@ def run():
 
     config      = get_config()
     enabled     = set(config.get("enabled_scenarios", list(range(1,11))))
-    blacklisted = set(config.get("blacklisted_symbols", []))
+    blacklisted = set(config.get("blacklisted_symbols",[]))
 
-    print("Fetching all Binance USDT perpetual pairs...")
-    symbols = get_all_symbols()
-    print(f"Found {len(symbols)} pairs\n")
+    print("Fetching top 50 USDT perpetual pairs by 24h volume...")
+    symbols = get_top_symbols(50)
+    # Remove blacklisted
+    symbols = [s for s in symbols if s not in blacklisted]
+    print(f"\nScanning {len(symbols)} pairs...\n")
 
     created = 0
 
     for symbol in symbols:
-        if symbol in blacklisted: continue
         try:
             ticker    = get_ticker(symbol)
             price     = sf(ticker.get("lastPrice"))
@@ -371,9 +362,9 @@ def run():
             print(f"  ✗ {symbol}: {e}")
             continue
 
-    update_status(f"ok — {created} signals", created)
+    update_status(f"ok — {created} signals (top 50 test)", created)
     print(f"\n{'='*60}")
-    print(f"Done. {created} signals generated.")
+    print(f"Done. {created} signals from top 50 pairs.")
     print(f"{'='*60}\n")
 
 
