@@ -172,10 +172,10 @@ export default function SignalsPage() {
         const sig = p.new as any
         setSignals(prev => [sig, ...prev])
         setNewCount(n => n + 1)
-        setNewIds(prev => new Set([...prev, sig.id]))
+        setNewIds(prev => new Set(Array.from(prev).concat(sig.id)))
         // Remove "new" highlight after 30s
         newTimer.current[sig.id] = setTimeout(() => {
-          setNewIds(prev => { const s = new Set(prev); s.delete(sig.id); return s })
+          setNewIds(prev => { const s = new Set(Array.from(prev)); s.delete(sig.id); return s })
         }, 30000)
       }).subscribe()
 
