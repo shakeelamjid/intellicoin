@@ -225,42 +225,6 @@ export default function DashboardPage() {
         {/* Right column */}
         <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
 
-          {/* Quick nav */}
-          <div style={{background:'#111420', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'12px', overflow:'hidden'}}>
-            <div style={{padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)', fontSize:'11px', fontWeight:'600', color:'#555870', textTransform:'uppercase', letterSpacing:'0.05em'}}>
-              Quick navigation
-            </div>
-            {[
-              {href:'/dashboard/signals',       icon:'📡', label:'Live signals',    desc:`${signals.length} active`},
-              {href:'/dashboard/performance',   icon:'📊', label:'Performance',     desc: winRate!==null?`${winRate}% win rate`:'No data yet'},
-              {href:'/dashboard/history',       icon:'📋', label:'Signal history',  desc:'Past signals & outcomes'},
-              ...(isAdmin?[
-                {href:'/dashboard/admin/users',   icon:'👥', label:'Users',           desc:`${userCount} members`},
-                {href:'/dashboard/admin/scanner', icon:'⚙️', label:'Scanner config',  desc:`${config?.kline_interval||'1h'} · ${scanInterval}min`},
-                {href:'/dashboard/admin/analytics',icon:'📈',label:'Analytics',       desc:'System overview'},
-              ]:[
-                {href:'/dashboard/notifications', icon:'🔔', label:'Notifications',   desc:'Alerts & preferences'},
-                {href:'/dashboard/profile',       icon:'👤', label:'Profile',         desc:'Your settings'},
-              ]),
-            ].map(item=>(
-              <Link key={item.href} href={item.href} style={{
-                display:'flex', alignItems:'center', gap:'10px',
-                padding:'10px 16px', borderBottom:'1px solid rgba(255,255,255,0.04)',
-                textDecoration:'none', transition:'background 0.1s',
-              }}
-                onMouseEnter={e=>(e.currentTarget.style.background='rgba(255,255,255,0.02)')}
-                onMouseLeave={e=>(e.currentTarget.style.background='transparent')}
-              >
-                <span style={{fontSize:'16px', width:'24px', textAlign:'center'}}>{item.icon}</span>
-                <div style={{flex:1, minWidth:0}}>
-                  <div style={{fontSize:'12px', fontWeight:'600', color:'#e8eaf2'}}>{item.label}</div>
-                  <div style={{fontSize:'10px', color:'#555870'}}>{item.desc}</div>
-                </div>
-                <span style={{color:'#555870', fontSize:'14px'}}>›</span>
-              </Link>
-            ))}
-          </div>
-
           {/* Scanner status card */}
           <div style={{background:'#111420', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'12px', padding:'14px 16px'}}>
             <div style={{fontSize:'11px', fontWeight:'600', color:'#555870', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'10px'}}>Scanner status</div>
