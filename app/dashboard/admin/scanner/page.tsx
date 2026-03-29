@@ -57,6 +57,7 @@ function getIntervalWarning(tf: string, interval: number): string | null {
 
 export default function ScannerConfigPage() {
   const [config, setConfig]   = useState<any>(null)
+  const [origTf, setOrigTf]   = useState<string>('')
   const [running, setRunning] = useState(false)
   const [runLog,  setRunLog]  = useState<string[]>([])
   const [saving,  setSaving]  = useState(false)
@@ -66,13 +67,18 @@ export default function ScannerConfigPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.from('scanner_config').select('*').single()
-      .then(({ data }) => { if (data) setConfig(data) })
+      .then(({ data }) => { if (data) { setConfig(data); setOrigTf(data.kline_interval || '1h') } })
   }, [])
 
   async function save() {
     if (!config) return
     setSaving(true)
     const supabase = createClient()
+
+    // Check if timeframe changed — if so, expire all active signals
+    const { data: oldConfig } = await supabase.from('scanner_config').select('kline_interval').eq('id', config.id).single()
+    const tfChanged = oldConfig && oldConfig.kline_interval !== config.kline_interval
+
     await supabase.from('scanner_config').update({
       scanner_enabled:        config.scanner_enabled,
       enabled_scenarios:      config.enabled_scenarios,
@@ -81,6 +87,13 @@ export default function ScannerConfigPage() {
       kline_interval:         config.kline_interval,
       scan_interval_minutes:  config.scan_interval_minutes,
     }).eq('id', config.id)
+
+    // If timeframe changed, expire all active signals so next scan generates fresh ones
+    if (tfChanged) {
+      await supabase.from('signals').update({ status: 'expired' }).eq('status', 'active')
+      setRunLog([`⚡ Timeframe changed to ${config.kline_interval} — all active signals expired`, 'Next scan will generate fresh signals with the new timeframe'])
+    }
+
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -261,6 +274,13 @@ export default function ScannerConfigPage() {
         {warn && (
           <div style={{ padding:'10px 14px', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:'8px', fontSize:'12px', color:'#f59e0b', marginTop:'12px' }}>
             {warn}
+          </div>
+        )}
+
+        {/* Timeframe change warning */}
+        {origTf && config.kline_interval !== origTf && (
+          <div style={{ marginTop:'10px', padding:'10px 14px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:'8px', fontSize:'12px', color:'#fca5a5' }}>
+            ⚠️ Changing from <strong>{origTf}</strong> to <strong>{config.kline_interval}</strong> will expire all current active signals. Next scan will generate fresh signals.
           </div>
         )}
 
