@@ -225,7 +225,7 @@ function SignalRow({ s, isNew, onChart }: { s: any; isNew: boolean; onChart: (s:
       style={{
         background: isPremium ? 'rgba(34,197,94,0.03)' : '#111420',
         border:`1px solid ${isPremium?'rgba(34,197,94,0.15)':isNew?'rgba(59,130,246,0.25)':'rgba(255,255,255,0.06)'}`,
-        borderRadius:'10px', padding:'11px 14px',
+        borderRadius:'8px', padding:'7px 12px',
         position:'relative', overflow:'hidden', cursor:'pointer',
         transition:'border-color 0.1s, background 0.1s',
       }}
@@ -240,79 +240,58 @@ function SignalRow({ s, isNew, onChart }: { s: any; isNew: boolean; onChart: (s:
     >
       {isPremium && <div style={{position:'absolute',top:0,left:0,right:0,height:'2px',background:'linear-gradient(90deg,#22c55e,#16a34a)'}}/>}
 
-      <div style={{display:'grid', gridTemplateColumns:'150px 90px 1fr 85px 85px 85px 85px 85px 130px', gap:'6px', alignItems:'center'}}>
+      {/* Single compact row — everything inline */}
+      <div style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'nowrap', overflow:'hidden'}}>
 
-        {/* Symbol + direction */}
-        <div style={{display:'flex', alignItems:'center', gap:'5px', minWidth:0}}>
-          <span style={{fontSize:'14px', fontWeight:'800', color:'#e8eaf2', letterSpacing:'-0.3px', whiteSpace:'nowrap'}}>{sym}</span>
-          <span style={{padding:'1px 5px', borderRadius:'3px', fontSize:'9px', fontWeight:'700', background:dm.bg, color:dm.text, flexShrink:0}}>{dir.toUpperCase()}</span>
-        </div>
+        {/* Symbol */}
+        <span style={{fontSize:'13px', fontWeight:'800', color:'#e8eaf2', letterSpacing:'-0.3px', whiteSpace:'nowrap', minWidth:'50px'}}>{sym}</span>
 
-        {/* Rank + TF */}
-        <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
-          <span style={{padding:'2px 7px', borderRadius:'4px', fontSize:'10px', fontWeight:'700', background:rm.bg, color:rm.text, border:`1px solid ${rm.border}`}}>
-            {isPremium?'⭐ ':''}{rank}
-          </span>
-          <span style={{padding:'1px 5px', borderRadius:'3px', fontSize:'9px', fontWeight:'600', background:'rgba(139,144,168,0.1)', color:'#8b90a8'}}>{tf}</span>
-          {s.confirmed_bybit && <span style={{fontSize:'9px', color:'#60a5fa', fontWeight:'700'}}>B✓</span>}
-          {isNew && <span style={{fontSize:'9px', color:'#3b82f6', fontWeight:'700'}}>NEW</span>}
-        </div>
+        {/* Direction */}
+        <span style={{padding:'1px 5px', borderRadius:'3px', fontSize:'9px', fontWeight:'700', background:dm.bg, color:dm.text, flexShrink:0}}>{dir.toUpperCase()}</span>
+
+        {/* Rank */}
+        <span style={{padding:'1px 6px', borderRadius:'3px', fontSize:'9px', fontWeight:'700', background:rm.bg, color:rm.text, flexShrink:0}}>{isPremium?'⭐':''}{rank}</span>
+
+        {/* TF */}
+        <span style={{padding:'1px 5px', borderRadius:'3px', fontSize:'9px', background:'rgba(255,255,255,0.05)', color:'#555870', flexShrink:0}}>{tf}</span>
+
+        {/* Scenario */}
+        <span style={{fontSize:'10px', color:'#555870', whiteSpace:'nowrap', flexShrink:0}}>S{s.scenario_id}</span>
+
+        {/* Divider */}
+        <span style={{color:'#2a2d3e', flexShrink:0}}>|</span>
 
         {/* Entry */}
-        <div style={{minWidth:0}}>
-          <div style={{fontSize:'9px', color:'#555870', marginBottom:'1px'}}>Entry</div>
-          <div style={{fontSize:'11px', fontWeight:'600', color:'#e8eaf2', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
-            {fp(s.entry_low)} – {fp(s.entry_high)}
-          </div>
-        </div>
+        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>Entry</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#e8eaf2', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.entry_low)}–{fp(s.entry_high)}</span>
+
+        <span style={{color:'#2a2d3e', flexShrink:0}}>|</span>
 
         {/* Stop */}
-        <div>
-          <div style={{fontSize:'9px', color:'#555870', marginBottom:'1px'}}>Stop</div>
-          <div style={{fontSize:'11px', fontWeight:'600', color:'#ef4444'}}>{fp(s.stop_loss)}</div>
-        </div>
+        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>SL</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#ef4444', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.stop_loss)}</span>
 
-        {/* TP1 */}
-        <div>
-          <div style={{fontSize:'9px', color:'#555870', marginBottom:'1px'}}>TP1{s.rr_ratio?` ·${(s.rr_ratio*0.5).toFixed(1)}x`:''}</div>
-          <div style={{fontSize:'11px', fontWeight:'600', color:'#22c55e'}}>{fp(s.tp1)}</div>
-        </div>
+        <span style={{color:'#2a2d3e', flexShrink:0}}>|</span>
 
-        {/* TP2 */}
-        <div>
-          <div style={{fontSize:'9px', color:'#555870', marginBottom:'1px'}}>TP2{s.rr_ratio?` ·${s.rr_ratio.toFixed(1)}x`:''}</div>
-          <div style={{fontSize:'11px', fontWeight:'600', color:'#22c55e'}}>{fp(s.tp2)}</div>
-        </div>
+        {/* TPs */}
+        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP1</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp1)}</span>
+        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP2</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp2)}</span>
+        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP3</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp3)}</span>
 
-        {/* TP3 */}
-        <div>
-          <div style={{fontSize:'9px', color:'#555870', marginBottom:'1px'}}>TP3{s.rr_ratio?` ·${(s.rr_ratio*1.6).toFixed(1)}x`:''}</div>
-          <div style={{fontSize:'11px', fontWeight:'600', color:'#22c55e'}}>{fp(s.tp3)}</div>
-        </div>
+        <span style={{color:'#2a2d3e', flexShrink:0}}>|</span>
 
         {/* Indicators */}
-        <div style={{fontSize:'10px', color:'#555870', lineHeight:'1.7'}}>
-          {s.oi_change_pct!=null && <div style={{color:s.oi_change_pct>3?'#22c55e':s.oi_change_pct<-3?'#ef4444':'#555870'}}>OI {s.oi_change_pct>0?'+':''}{s.oi_change_pct.toFixed(1)}%</div>}
-          {s.adx_value!=null && <div style={{color:s.adx_value>30?'#22c55e':s.adx_value>22?'#f59e0b':'#555870'}}>ADX {s.adx_value.toFixed(0)}</div>}
-        </div>
+        {s.oi_change_pct!=null && <span style={{fontSize:'10px', color:s.oi_change_pct>3?'#22c55e':s.oi_change_pct<-3?'#ef4444':'#555870', whiteSpace:'nowrap', flexShrink:0}}>OI {s.oi_change_pct>0?'+':''}{s.oi_change_pct.toFixed(1)}%</span>}
+        {s.adx_value!=null     && <span style={{fontSize:'10px', color:s.adx_value>30?'#22c55e':s.adx_value>22?'#f59e0b':'#555870', whiteSpace:'nowrap', flexShrink:0}}>ADX {s.adx_value.toFixed(0)}</span>}
+        {s.confirmed_bybit     && <span style={{fontSize:'9px', color:'#60a5fa', flexShrink:0}}>B✓</span>}
+        {isNew                 && <span style={{fontSize:'9px', color:'#3b82f6', fontWeight:'700', flexShrink:0}}>NEW</span>}
 
-        {/* Time + open chart hint */}
-        <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'3px'}}>
-          <span style={{fontSize:'10px', color:'#e8eaf2', fontWeight:'500'}}>{fmtTime(s.created_at)}</span>
-          <span style={{fontSize:'10px', color:'#555870'}}>{timeAgo(s.created_at)}</span>
-          <span style={{fontSize:'9px', color:'#3b82f6', opacity:0.7}}>Click to open chart</span>
-        </div>
+        {/* Time — pushed to right */}
+        <span style={{marginLeft:'auto', fontSize:'10px', color:'#555870', whiteSpace:'nowrap', flexShrink:0}}>{timeAgo(s.created_at)}</span>
       </div>
-
-      {/* Sub-row */}
-      {(s.fr_at_signal!=null || s.volume_ratio!=null) && (
-        <div style={{display:'flex', gap:'10px', marginTop:'5px', paddingTop:'5px', borderTop:'1px solid rgba(255,255,255,0.04)', fontSize:'10px', color:'#555870'}}>
-          <span>S{s.scenario_id} · {SCENARIO[s.scenario_id]?.name}</span>
-          {s.fr_at_signal!=null  && <span>FR {(s.fr_at_signal*100).toFixed(4)}%</span>}
-          {s.volume_ratio!=null  && <span>Vol {s.volume_ratio.toFixed(1)}x</span>}
-          {s.suggested_leverage  && <span>Lev {s.suggested_leverage}x</span>}
-        </div>
-      )}
     </div>
   )
 }
@@ -539,7 +518,7 @@ export default function SignalsPage() {
       )}
 
       {!loading && filtered.length>0 && (
-        <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
+        <div style={{display:'flex', flexDirection:'column', gap:'3px'}}>
           {filtered.map(s=>(
             <SignalRow key={s.id} s={s} isNew={newIds.has(s.id)} onChart={setChartSignal}/>
           ))}
