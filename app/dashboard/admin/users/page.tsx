@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const F = "'Helvetica Neue', Helvetica, Arial, sans-serif"
@@ -23,7 +23,7 @@ const RANKS = [
   { value:'C', label:'C', color:'#8b90a8', bg:'rgba(139,144,168,0.1)' },
 ]
 
-const DIR_COLOR = { long:'#22c55e', short:'#ef4444', watch:'#f59e0b' }
+const DIR_COLOR: Record<string, string> = { long:'#22c55e', short:'#ef4444', watch:'#f59e0b' }
 
 function getRanksFromUser(user) {
   if (user.allowed_ranks && Array.isArray(user.allowed_ranks) && user.allowed_ranks.length > 0) return user.allowed_ranks
@@ -150,10 +150,10 @@ export default function AdminUsersPage() {
     setTimeout(() => { setSaved(false); setEditing(null) }, 1200)
   }
 
-  const inp = { width:'100%', padding:'8px 10px', background:'#181c2e', border:'1px solid rgba(255,255,255,0.09)', borderRadius:'7px', color:'#e8eaf2', fontSize:'13px', outline:'none', boxSizing:'border-box' }
-  const lbl = { display:'block', fontSize:'11px', color:'#8b90a8', marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.05em' }
-  const sec = { marginBottom:'18px' }
-  const smallBtn = { fontSize:'10px', color:'#555870', background:'none', border:'none', cursor:'pointer', padding:'0', textDecoration:'underline' }
+  const inp: React.CSSProperties = { width:'100%', padding:'8px 10px', background:'#181c2e', border:'1px solid rgba(255,255,255,0.09)', borderRadius:'7px', color:'#e8eaf2', fontSize:'13px', outline:'none', boxSizing:'border-box' }
+  const lbl: React.CSSProperties = { display:'block', fontSize:'11px', color:'#8b90a8', marginBottom:'5px', textTransform:'uppercase', letterSpacing:'0.05em' }
+  const sec: React.CSSProperties = { marginBottom:'18px' }
+  const smallBtn: React.CSSProperties = { fontSize:'10px', color:'#555870', background:'none', border:'none', cursor:'pointer', padding:'0', textDecoration:'underline' }
 
   return (
     <div style={{ padding:'28px', fontFamily:F }}>
