@@ -2,6 +2,7 @@
 IntelliCoin Scanner — TOP 50 TEST VERSION
 Scans only top 50 USDT perp pairs by 24h volume
 Gate-based ranking: S / A / B / C
+HTTP proxies only (no SOCKS)
 """
 import os, time, random, requests
 from datetime import datetime, timezone
@@ -20,6 +21,9 @@ BINANCE_ENDPOINTS = [
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
+# SOCKS ports to skip — we only want HTTP proxies
+SOCKS_PORTS = {1080, 1081, 1082, 9050, 9150, 4145, 4153, 5678}
+
 # ─── Proxy setup ──────────────────────────────────────────────────────────────
 
 def get_working_proxy():
@@ -30,38 +34,54 @@ def get_working_proxy():
 
     sources = [
         "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=3000&country=DE,NL,FR,PL,CZ,RO,HU,BG,UA,RS&anonymity=elite,anonymous&format=text",
-        "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=3000&country=all&anonymity=elite,anonymous&format=text",
+        "https://api.proxyscrape.com/v4/free-proxy-list/get?request=displayproxies&protocol=http&timeout=5000&country=all&anonymity=elite,anonymous&format=text",
         "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
     ]
 
     for source_url in sources:
         try:
-            print(f"Fetching proxies from {source_url[:60]}...")
+            print(f"Fetching from {source_url[:60]}...")
             r = requests.get(source_url, timeout=8)
             lines = [l.strip() for l in r.text.strip().split("\n") if ":" in l.strip()]
             if not lines:
                 continue
-            random.shuffle(lines)
-            print(f"Testing up to 10 from {len(lines)} proxies...")
-            for proxy_str in lines[:10]:
-                if not proxy_str or ":" not in proxy_str:
+
+            # Filter out SOCKS ports
+            http_only = []
+            for line in lines:
+                try:
+                    port = int(line.strip().split(":")[1])
+                    if port not in SOCKS_PORTS:
+                        http_only.append(line.strip())
+                except:
                     continue
-                proxy_dict = {"https": f"http://{proxy_str}", "http": f"http://{proxy_str}"}
+
+            random.shuffle(http_only)
+            print(f"Testing up to 15 HTTP proxies from {len(http_only)} available...")
+
+            for proxy_str in http_only[:15]:
+                proxy_dict = {
+                    "https": f"http://{proxy_str}",
+                    "http":  f"http://{proxy_str}",
+                }
                 try:
                     test = requests.get(
                         "https://fapi.binance.com/fapi/v1/ping",
-                        proxies=proxy_dict, timeout=4, headers=HEADERS,
+                        proxies=proxy_dict,
+                        timeout=5,
+                        headers=HEADERS,
                     )
                     if test.status_code == 200:
-                        print(f"✓ Working proxy: {proxy_str}")
+                        print(f"✓ Working HTTP proxy: {proxy_str}")
                         return proxy_dict
                 except:
                     continue
+
         except Exception as e:
             print(f"Source failed: {e}")
             continue
 
-    print("No proxy found — proceeding without proxy")
+    print("No working proxy found — proceeding without proxy")
     return None
 
 
@@ -96,17 +116,14 @@ def sf(v):
     except: return None
 
 
-# ─── Get top 50 symbols by 24h volume ─────────────────────────────────────────
+# ─── Get top N symbols by 24h volume ──────────────────────────────────────────
 
 def get_top_symbols(n=50):
-    """Fetch all 24h tickers and return top N by quoteVolume (USDT volume)"""
     tickers = get("/fapi/v1/ticker/24hr")
-    # Filter to active USDT perpetuals
     usdt = [t for t in tickers if t["symbol"].endswith("USDT")]
-    # Sort by quote volume descending
     usdt.sort(key=lambda t: float(t.get("quoteVolume", 0)), reverse=True)
     top = usdt[:n]
-    print(f"Top {n} symbols by 24h volume:")
+    print(f"Top {n} by 24h volume:")
     for i, t in enumerate(top[:10]):
         vol_b = float(t["quoteVolume"]) / 1_000_000_000
         print(f"  {i+1:2}. {t['symbol']:20} ${vol_b:.1f}B")
@@ -170,7 +187,7 @@ def calc_adx(klines, period=14):
         if len(klines)<period+1: return None
         H=[float(k[2]) for k in klines]; L=[float(k[3]) for k in klines]; C=[float(k[4]) for k in klines]
         tr_l,pdm_l,ndm_l=[],[],[]
-        for i in range(1,len(klines)):
+        for i in range(1, len(klines)):
             tr=max(H[i]-L[i],abs(H[i]-C[i-1]),abs(L[i]-C[i-1]))
             pdm=max(H[i]-H[i-1],0) if H[i]-H[i-1]>L[i-1]-L[i] else 0
             ndm=max(L[i-1]-L[i],0) if L[i-1]-L[i]>H[i]-H[i-1]  else 0
@@ -203,7 +220,7 @@ SCENARIO_DIRECTION = {
 
 def classify(pc, oi, vol, fr):
     up=pc>1.5; dn=pc<-1.5; fl=not up and not dn
-    oiU=oi is not None and oi>3;   oiD=oi is not None and oi<-3
+    oiU=oi is not None and oi>3;    oiD=oi is not None and oi<-3
     vH=vol is not None and vol>1.5; vL=vol is not None and vol<0.7
     fhP=fr is not None and fr>0.0008; fhN=fr is not None and fr<-0.0008
     fxP=fr is not None and fr>0.002;  fxN=fr is not None and fr<-0.002
@@ -297,11 +314,10 @@ def run():
 
     config      = get_config()
     enabled     = set(config.get("enabled_scenarios", list(range(1,11))))
-    blacklisted = set(config.get("blacklisted_symbols",[]))
+    blacklisted = set(config.get("blacklisted_symbols", []))
 
     print("Fetching top 50 USDT perpetual pairs by 24h volume...")
     symbols = get_top_symbols(50)
-    # Remove blacklisted
     symbols = [s for s in symbols if s not in blacklisted]
     print(f"\nScanning {len(symbols)} pairs...\n")
 
