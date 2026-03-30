@@ -215,7 +215,7 @@ export default function ScannerConfigPage() {
           GoDaddy cron fires every 15 minutes. The scanner self-throttles based on the interval you set here — no cron changes needed.
         </p>
 
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px', marginBottom: warn ? '12px' : '0' }}>
+        <div style={{ marginBottom: warn ? '12px' : '0' }}>
 
           {/* Kline timeframe */}
           <div>
@@ -243,30 +243,6 @@ export default function ScannerConfigPage() {
             </div>
           </div>
 
-          {/* Scan interval */}
-          <div>
-            <label style={{ display:'block', fontSize:'11px', color:'#8b90a8', marginBottom:'8px', textTransform:'uppercase', letterSpacing:'0.05em' }}>
-              How often to scan
-            </label>
-            <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
-              {INTERVALS.map(iv => (
-                <label key={iv.value} style={{
-                  display:'flex', alignItems:'center', gap:'10px', cursor:'pointer',
-                  padding:'8px 12px', borderRadius:'8px',
-                  background: config.scan_interval_minutes === iv.value ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.02)',
-                  border: `1px solid ${config.scan_interval_minutes === iv.value ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  transition:'all 0.1s',
-                }}>
-                  <input type="radio" checked={config.scan_interval_minutes === iv.value}
-                    onChange={() => setConfig({ ...config, scan_interval_minutes: iv.value })}
-                    style={{ accentColor:'#3b82f6', width:'14px', height:'14px' }} />
-                  <span style={{ fontSize:'13px', color: config.scan_interval_minutes === iv.value ? '#e8eaf2' : '#8b90a8' }}>{iv.label}</span>
-                  {config.scan_interval_minutes === iv.value && (
-                    <span style={{ marginLeft:'auto', fontSize:'10px', color:'#3b82f6', fontWeight:'600' }}>ACTIVE</span>
-                  )}
-                </label>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -338,7 +314,7 @@ export default function ScannerConfigPage() {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px' }}>
           <h2 style={sectionTitle}>Enabled scenarios</h2>
           <div style={{ display:'flex', gap:'8px' }}>
-            <button onClick={() => setConfig({ ...config, enabled_scenarios:[1,2,3,4,5,6,7,8,9,10] })}
+            <button onClick={() => setConfig({ ...config, enabled_scenarios:[1,2,3,4,5,6,7,8,9] })}
               style={{ fontSize:'11px', color:'#555870', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>All</button>
             <button onClick={() => setConfig({ ...config, enabled_scenarios:[] })}
               style={{ fontSize:'11px', color:'#555870', background:'none', border:'none', cursor:'pointer', textDecoration:'underline' }}>None</button>
