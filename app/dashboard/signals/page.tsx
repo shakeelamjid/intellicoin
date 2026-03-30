@@ -324,16 +324,24 @@ export default function SignalsPage() {
   const [newCount,    setNewCount]    = useState(0)
   const timers = useRef<any>({})
 
-  useEffect(() => {
+  function fetchSignals() {
     const supabase = createClient()
     supabase.from('signals').select('*').eq('status','active')
       .order('created_at',{ascending:false}).limit(500)
       .then(({data}) => { setSignals(data||[]); setLoading(false) })
+  }
 
+  useEffect(() => {
+    fetchSignals()
+
+    const supabase = createClient()
+
+    // Realtime subscription
     const ch = supabase.channel('signals_live')
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'signals'}, p => {
         const sig = p.new as any
-        setSignals(prev=>[sig,...prev])
+        if (sig.status !== 'active') return
+        setSignals(prev=>[sig,...prev.filter(s=>s.id!==sig.id)])
         setNewCount(n=>n+1)
         setNewIds(prev=>new Set(Array.from(prev).concat(sig.id)))
         timers.current[sig.id] = setTimeout(()=>{
@@ -347,8 +355,12 @@ export default function SignalsPage() {
       })
       .subscribe()
 
+    // Fallback: full refresh every 2 minutes in case realtime misses anything
+    const refreshTimer = setInterval(fetchSignals, 120000)
+
     return ()=>{
       supabase.removeChannel(ch)
+      clearInterval(refreshTimer)
       Object.values(timers.current).forEach(t=>clearTimeout(t as any))
     }
   },[])
