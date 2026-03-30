@@ -85,7 +85,6 @@ export default function ScannerConfigPage() {
       min_rank_to_broadcast:  config.min_rank_to_broadcast,
       blacklisted_symbols:    config.blacklisted_symbols,
       kline_interval:         config.kline_interval,
-      scan_interval_minutes:  config.scan_interval_minutes,
     }).eq('id', config.id)
 
     // If timeframe changed, expire all active signals so next scan generates fresh ones
@@ -143,7 +142,7 @@ export default function ScannerConfigPage() {
 
   if (!config) return <div style={{ padding:'40px', color:'#555870', fontFamily:F }}>Loading…</div>
 
-  const warn = getIntervalWarning(config.kline_interval || '1h', config.scan_interval_minutes || 60)
+  const warn = null
 
   const card: React.CSSProperties = {
     background:'#111420', border:'1px solid rgba(255,255,255,0.07)',
@@ -262,9 +261,8 @@ export default function ScannerConfigPage() {
 
         {/* Summary */}
         <div style={{ marginTop:'14px', padding:'10px 14px', background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:'8px', fontSize:'12px', color:'#60a5fa' }}>
-          Scanner will use <strong>{TIMEFRAMES.find(t=>t.value===config.kline_interval)?.label || config.kline_interval}</strong> candles
-          and run every <strong>{config.scan_interval_minutes} minutes</strong>.
-          GoDaddy cron fires every 15min — scanner self-throttles.
+          Scanner will use <strong>{TIMEFRAMES.find(t=>t.value===config.kline_interval)?.label || config.kline_interval}</strong> candles.
+          Scanner runs on every cron fire — set your cron interval in GoDaddy cPanel.
         </div>
       </div>
 
