@@ -333,8 +333,9 @@ export default function SignalsPage() {
   }
 
   useEffect(() => {
-    // Load user preferences
     const supabase = createClient()
+
+    // Load user preferences
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
       const { data: profile } = await supabase
@@ -345,8 +346,6 @@ export default function SignalsPage() {
       if (profile) setUserPrefs(profile)
     })
     fetchSignals()
-
-    const supabase = createClient()
 
     // Realtime subscription
     const ch = supabase.channel('signals_live')
