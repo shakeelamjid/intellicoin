@@ -357,6 +357,7 @@ export default function AdminUsersPage() {
                     { label:'Telegram DM',          sub:'Send alerts to personal Telegram',   key:'notify_telegram' },
                     { label:'Weekend signals',       sub:'Receive signals on Sat & Sun',       key:'weekend_signals' },
                     { label:'Account active',        sub:'Disable to suspend this user',       key:'is_active'       },
+                    { label:'Allow auto-trade',      sub:'Let this user use the auto-trade bot', key:'auto_trade_enabled'},
                   ].map(f => (
                     <div key={f.key} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 14px', background:'rgba(255,255,255,0.03)', borderRadius:'10px', border:'1px solid rgba(255,255,255,0.05)' }}>
                       <div>
