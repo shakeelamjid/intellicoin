@@ -242,9 +242,6 @@ export default function ScannerConfigPage() {
             </div>
           </div>
 
-          </div>
-        </div>
-
         {/* Warning */}
         {warn && (
           <div style={{ padding:'10px 14px', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:'8px', fontSize:'12px', color:'#f59e0b', marginTop:'12px' }}>
