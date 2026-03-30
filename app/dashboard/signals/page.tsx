@@ -311,6 +311,7 @@ function FPill({ active, onClick, children, color }: { active:boolean; onClick:(
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function SignalsPage() {
   const [signals,     setSignals]     = useState<any[]>([])
+  const [userPrefs,   setUserPrefs]   = useState<any>(null)
   const [loading,     setLoading]     = useState(true)
   const [chartSignal, setChartSignal] = useState<any>(null)
   const [filterDir,   setFilterDir]   = useState('all')
@@ -332,6 +333,17 @@ export default function SignalsPage() {
   }
 
   useEffect(() => {
+    // Load user preferences
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return
+      const { data: profile } = await supabase
+        .from('users')
+        .select('allowed_ranks, allowed_scenarios, min_rank_access')
+        .eq('id', data.user.id)
+        .single()
+      if (profile) setUserPrefs(profile)
+    })
     fetchSignals()
 
     const supabase = createClient()
@@ -369,8 +381,24 @@ export default function SignalsPage() {
   const timeMs: Record<string,number> = {'1h':3600000,'4h':14400000,'24h':86400000,'all':Infinity}
   const rankOrder: Record<string,number> = {S:4,A:3,B:2,C:1}
 
-  // Pre-filter: remove watch signals with no meaningful trade setup (TP = entry)
-  const meaningful = signals.filter(s => {
+  // Pre-filter 1: apply user's rank & scenario preferences
+  const userFiltered = signals.filter(s => {
+    if (userPrefs) {
+      const ranks = userPrefs.allowed_ranks?.length > 0
+        ? userPrefs.allowed_ranks
+        : userPrefs.min_rank_access === 'S' ? ['S']
+        : userPrefs.min_rank_access === 'SA' ? ['S','A']
+        : userPrefs.min_rank_access === 'SAB' ? ['S','A','B']
+        : ['S','A','B','C']
+      if (!ranks.includes(s.signal_rank)) return false
+      const scenarios = userPrefs.allowed_scenarios
+      if (scenarios && scenarios.length > 0 && !scenarios.includes(s.scenario_id)) return false
+    }
+    return true
+  })
+
+  // Pre-filter 2: remove watch signals with no meaningful trade setup (TP = entry)
+  const meaningful = userFiltered.filter(s => {
     if (s.direction === 'watch') {
       // Only keep watch if it has a real TP different from entry
       return s.tp1 && s.entry_high && Math.abs(s.tp1 - s.entry_high) > 0.0001 * s.entry_high
