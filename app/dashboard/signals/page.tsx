@@ -357,7 +357,16 @@ export default function SignalsPage() {
   const timeMs: Record<string,number> = {'1h':3600000,'4h':14400000,'24h':86400000,'all':Infinity}
   const rankOrder: Record<string,number> = {S:4,A:3,B:2,C:1}
 
-  let filtered = signals.filter(s=>{
+  // Pre-filter: remove watch signals with no meaningful trade setup (TP = entry)
+  const meaningful = signals.filter(s => {
+    if (s.direction === 'watch') {
+      // Only keep watch if it has a real TP different from entry
+      return s.tp1 && s.entry_high && Math.abs(s.tp1 - s.entry_high) > 0.0001 * s.entry_high
+    }
+    return true
+  })
+
+  let filtered = meaningful.filter(s=>{
     if (filterDir!=='all' && s.direction!==filterDir) return false
     if (filterRank.length>0 && !filterRank.includes(s.signal_rank)) return false
     if (filterSc.length>0   && !filterSc.includes(s.scenario_id))   return false
@@ -413,7 +422,7 @@ export default function SignalsPage() {
             <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'#22c55e', display:'inline-block', boxShadow:'0 0 6px #22c55e', animation:'pulse 2s infinite'}}/>
           </h1>
           <p style={{fontSize:'11px', color:'#555870'}}>
-            {filtered.length} of {signals.length} · click any signal to open chart
+            {filtered.length} of {meaningful.length} · click any signal to open chart
             {newCount>0 && <span style={{marginLeft:'8px', color:'#22c55e', fontWeight:'600'}}>+{newCount} new</span>}
           </p>
         </div>
