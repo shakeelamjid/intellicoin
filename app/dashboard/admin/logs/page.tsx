@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 
 const F  = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const MN = "'JetBrains Mono','Fira Code','SF Mono',monospace"
-const API = 'https://intellicoinapp.com/scanner/log_api.php'
+const API = '/api/logs'
 
 const LOGS = [
   { id: 'auto_trade',        label: 'Auto Trade',       icon: '🤖' },
