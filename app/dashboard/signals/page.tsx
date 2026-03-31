@@ -174,9 +174,9 @@ function ChartModal({ signal, onClose }: { signal: any; onClose: () => void }) {
           {[
             {label:'Entry zone', val:`${fp(signal.entry_low)} – ${fp(signal.entry_high)}`, color:'#e8eaf2'},
             {label:'Stop loss',  val:fp(signal.stop_loss),  color:'#ef4444'},
-            {label:'TP1', val:`${fp(signal.tp1)}${signal.rr_ratio?` · ${(signal.rr_ratio*0.5).toFixed(1)}x`:''}`, color:'#22c55e'},
-            {label:'TP2', val:`${fp(signal.tp2)}${signal.rr_ratio?` · ${signal.rr_ratio.toFixed(1)}x`:''}`, color:'#22c55e'},
-            {label:'TP3', val:`${fp(signal.tp3)}${signal.rr_ratio?` · ${(signal.rr_ratio*1.6).toFixed(1)}x`:''}`, color:'#22c55e'},
+            {label:'TP1', val:`${fp(signal.tp1)} · ${signal.rr_ratio?signal.rr_ratio.toFixed(1)+'x RR':''}`, color:'#22c55e'},
+            ...(signal.tp2 ? [{label:'TP2', val:fp(signal.tp2), color:'#22c55e'}] : []),
+            ...(signal.tp3 ? [{label:'TP3', val:fp(signal.tp3), color:'#22c55e'}] : []),
             {label:'Leverage', val:`${signal.suggested_leverage || '—'}x`, color:'#f59e0b'},
           ].map(item => (
             <div key={item.label} style={{background:'#0f1220', padding:'8px 12px'}}>
@@ -276,10 +276,10 @@ function SignalRow({ s, isNew, onChart }: { s: any; isNew: boolean; onChart: (s:
         {/* TPs */}
         <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP1</span>
         <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp1)}</span>
-        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP2</span>
-        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp2)}</span>
-        <span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP3</span>
-        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp3)}</span>
+        {s.tp2 && <><span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP2</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp2)}</span></>}
+        {s.tp3 && <><span style={{fontSize:'10px', color:'#555870', flexShrink:0}}>TP3</span>
+        <span style={{fontSize:'11px', fontWeight:'600', color:'#22c55e', whiteSpace:'nowrap', flexShrink:0}}>{fp(s.tp3)}</span></>}
 
         <span style={{color:'#2a2d3e', flexShrink:0}}>|</span>
 
