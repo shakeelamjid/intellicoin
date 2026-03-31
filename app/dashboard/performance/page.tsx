@@ -58,7 +58,7 @@ export default function PerformancePage() {
       if (!outData?.length) { setOutcomes([]); setLoading(false); return }
 
       // Fetch related signals
-      const signalIds = [...new Set(outData.map((o:any) => o.signal_id).filter(Boolean))]
+      const signalIds = Array.from(new Set(outData.map((o:any) => o.signal_id).filter(Boolean)))
       const { data: sigData } = await supabase
         .from('signals')
         .select('id, symbol, scenario_id, signal_rank, direction')
