@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 
 const F  = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 const MN = "'JetBrains Mono','Fira Code','SF Mono',monospace"
-const API = '/api/logs'
+const API = 'https://intellicoinapp.com/scanner/log_api.php'
 
 const LOGS = [
   { id: 'auto_trade',        label: 'Auto Trade',       icon: '🤖' },
@@ -46,6 +46,63 @@ interface LogGroup {
   hasWarning: boolean
   hasSuccess: boolean
   expanded: boolean
+}
+
+// ── Per-symbol trade block parser for position monitor ────────────────────
+interface TradeBlock {
+  symbol: string; direction: string; isOpen: boolean
+  latestPnl: string|null; latestPrice: string|null
+  latestDecision: {label:string;color:string;bg:string}|null
+  lastSeen: string; lines: {ts:string;msg:string;type:string}[]
+  hasError: boolean; hasCritical: boolean
+}
+
+function decisionTag(msg: string): {label:string;color:string;bg:string}|null {
+  const m = msg.toLowerCase()
+  if (m.includes('critical')||m.includes('unprotected')) return {label:'🚨 Critical',color:'#dc2626',bg:'rgba(220,38,38,0.15)'}
+  if (m.includes('early exit'))  return {label:'⚡ Early Exit',color:'#f59e0b',bg:'rgba(245,158,11,0.12)'}
+  if (m.includes('sl moved to tp1')) return {label:'🔒 SL→TP1',color:'#22c55e',bg:'rgba(34,197,94,0.12)'}
+  if (m.includes('breakeven set')||m.includes('breakeven sl')) return {label:'⚖️ Breakeven',color:'#60a5fa',bg:'rgba(59,130,246,0.12)'}
+  if (m.includes('trail'))       return {label:'📈 Trailing',color:'#a78bfa',bg:'rgba(167,139,250,0.12)'}
+  if (m.includes('recovered'))   return {label:'🔧 Recovered',color:'#f59e0b',bg:'rgba(245,158,11,0.12)'}
+  if (m.includes('sl missing')||m.includes('missing')) return {label:'⚠ Missing',color:'#ef4444',bg:'rgba(239,68,68,0.12)'}
+  if (m.includes('outcome:') && m.includes('tp')) return {label:'✅ TP Hit',color:'#22c55e',bg:'rgba(34,197,94,0.12)'}
+  if (m.includes('outcome:') && m.includes('sl_hit')) return {label:'🔴 SL Hit',color:'#ef4444',bg:'rgba(239,68,68,0.12)'}
+  if (m.includes('manual close')) return {label:'👤 Manual',color:'#8b90a8',bg:'rgba(139,144,168,0.1)'}
+  if (m.includes('hold') && m.includes('all ok')) return {label:'✓ Hold',color:'#22c55e',bg:'rgba(34,197,94,0.08)'}
+  return null
+}
+
+function parsePositionBlocks(lines: LogLine[]): TradeBlock[] {
+  const blocks: Record<string,TradeBlock> = {}
+  let lastSym = ''
+  for (const line of lines) {
+    const msg = line.message || ''
+    const symMatch = msg.match(/\[([A-Z0-9]+USDT)\]\s+(long|short)/)
+    if (symMatch) {
+      const sym = symMatch[1]
+      lastSym = sym
+      if (!blocks[sym]) blocks[sym] = {
+        symbol:sym, direction:symMatch[2], isOpen:true,
+        latestPnl:null, latestPrice:null, latestDecision:null,
+        lastSeen:line.ts_pkt||'', lines:[], hasError:false, hasCritical:false,
+      }
+    }
+    if (lastSym) {
+      blocks[lastSym].lines.push({ts:line.ts_pkt||'',msg,type:line.type})
+      blocks[lastSym].lastSeen = line.ts_pkt||blocks[lastSym].lastSeen
+      const pnl = msg.match(/Live P&L:\s*([+-][\d.]+%)/)
+      if (pnl) blocks[lastSym].latestPnl = pnl[1]
+      const px = msg.match(/Mkt price:\s*\$?([\d.]+)/)
+      if (px) blocks[lastSym].latestPrice = '$'+px[1]
+      if (msg.includes('Position CLOSED')||msg.includes('Outcome:')) blocks[lastSym].isOpen = false
+      if (line.type==='critical') blocks[lastSym].hasCritical = true
+      if (line.type==='error'||line.type==='warning') blocks[lastSym].hasError = true
+      const tag = decisionTag(msg)
+      if (tag) blocks[lastSym].latestDecision = tag
+    }
+  }
+  return Object.values(blocks).sort((a,b)=>a.isOpen===b.isOpen?0:a.isOpen?-1:1)
 }
 
 function groupLines(lines: LogLine[]): LogGroup[] {
@@ -113,7 +170,9 @@ export default function LogsPage() {
   const [meta,       setMeta]       = useState<any>({})
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState('')
-  const [view,       setView]       = useState<'grouped'|'raw'>('grouped')
+  const [view,       setView]       = useState<'grouped'|'raw'|'positions'>('grouped')
+  const [tradeBlocks,setTradeBlocks]= useState<TradeBlock[]>([])
+  const [expandedBlocks,setExpandedBlocks]=useState<Set<string>>(new Set())
   const [groups,     setGroups]     = useState<LogGroup[]>([])
   const [expanded,   setExpanded]   = useState<Set<string>>(new Set())
   const [autoRefresh,setAutoRefresh]= useState(false)
@@ -130,6 +189,7 @@ export default function LogsPage() {
       setLines(data.lines || [])
       setMeta({ total: data.total, filtered: data.filtered, file: data.file, last_modified: data.last_modified })
       setGroups(groupLines(data.lines || []))
+      setTradeBlocks(parsePositionBlocks(data.lines || []))
     } catch(e: any) {
       setError('Failed to fetch logs: ' + e.message)
     } finally {
@@ -137,7 +197,11 @@ export default function LogsPage() {
     }
   }, [])
 
-  useEffect(() => { load(activeLog, search) }, [activeLog, load])
+  useEffect(() => {
+    load(activeLog, search)
+    if (activeLog === 'position_monitor') setView('positions')
+    else if (view === 'positions') setView('grouped')
+  }, [activeLog, load])
 
   useEffect(() => {
     if (autoRefresh) {
@@ -271,7 +335,7 @@ export default function LogsPage() {
           {/* View toggle */}
           <div style={{display:'flex', gap:'2px', background:'rgba(255,255,255,0.04)',
             borderRadius:'6px', padding:'2px'}}>
-            {(['grouped','raw'] as const).map(v=>(
+            {(activeLog==='position_monitor'?['positions','grouped','raw']:['grouped','raw'] as const).map((v:any)=>(
               <button key={v} onClick={()=>setView(v)} style={{
                 padding:'4px 10px', borderRadius:'4px', border:'none', cursor:'pointer',
                 fontSize:'11px', fontFamily:F,
@@ -307,6 +371,90 @@ export default function LogsPage() {
           <div style={{background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)',
             borderRadius:'8px', padding:'14px', color:'#ef4444', fontSize:'13px', marginBottom:'16px'}}>
             ⚠ {error}
+          </div>
+        )}
+
+        {/* ── POSITIONS VIEW (position monitor only) ── */}
+        {!loading && view === 'positions' && (
+          <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+            {tradeBlocks.length===0 && <div style={{textAlign:'center',padding:'60px',color:'#555870'}}>No position data found in logs</div>}
+            {tradeBlocks.map(b=>{
+              const isExp = expandedBlocks.has(b.symbol)
+              const border = b.hasCritical?'rgba(220,38,38,0.35)':b.isOpen?'rgba(59,130,246,0.2)':
+                b.latestDecision?.label.includes('TP')?'rgba(34,197,94,0.2)':
+                b.latestDecision?.label.includes('SL')?'rgba(239,68,68,0.2)':'rgba(255,255,255,0.05)'
+              return (
+                <div key={b.symbol} style={{background:b.isOpen?'#0c0e17':'#09090f',border:`1px solid ${border}`,
+                  borderRadius:'10px',overflow:'hidden',opacity:b.isOpen?1:0.7}}>
+                  {/* Row */}
+                  <div onClick={()=>{const n=new Set(expandedBlocks);n.has(b.symbol)?n.delete(b.symbol):n.add(b.symbol);setExpandedBlocks(n)}}
+                    style={{display:'grid',gridTemplateColumns:'140px 60px 1fr 90px 90px 40px',
+                      gap:'8px',padding:'11px 14px',cursor:'pointer',alignItems:'center'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.02)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    <div>
+                      <div style={{fontSize:'14px',fontWeight:'800',color:b.isOpen?'#e8eaf2':'#8b90a8'}}>
+                        {b.symbol.replace('USDT','')}<span style={{color:'#555870',fontSize:'10px',fontWeight:'400'}}>/USDT</span>
+                      </div>
+                      <div style={{fontSize:'9px',color:'#555870'}}>{b.lastSeen}</div>
+                    </div>
+                    <span style={{padding:'2px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'800',
+                      background:b.direction==='long'?'rgba(34,197,94,0.15)':'rgba(239,68,68,0.15)',
+                      color:b.direction==='long'?'#22c55e':'#ef4444'}}>
+                      {b.direction?.toUpperCase()}
+                    </span>
+                    <div style={{display:'flex',gap:'5px',flexWrap:'wrap',alignItems:'center'}}>
+                      <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',
+                        background:b.isOpen?'rgba(59,130,246,0.12)':'rgba(139,144,168,0.1)',
+                        color:b.isOpen?'#60a5fa':'#8b90a8'}}>
+                        {b.isOpen?'Open':'Closed'}
+                      </span>
+                      {b.latestDecision && (
+                        <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',
+                          background:b.latestDecision.bg,color:b.latestDecision.color}}>
+                          {b.latestDecision.label}
+                        </span>
+                      )}
+                      {b.hasCritical && <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',background:'rgba(220,38,38,0.15)',color:'#dc2626'}}>🚨 Critical</span>}
+                      {b.hasError && !b.hasCritical && <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',background:'rgba(245,158,11,0.1)',color:'#f59e0b'}}>⚠ Warning</span>}
+                    </div>
+                    <span style={{fontFamily:MN,fontSize:'12px',fontWeight:'700',
+                      color:b.latestPnl?.startsWith('+')?'#22c55e':b.latestPnl?.startsWith('-')?'#ef4444':'#8b90a8'}}>
+                      {b.latestPnl||'—'}
+                    </span>
+                    <span style={{fontFamily:MN,fontSize:'11px',color:'#8b90a8'}}>{b.latestPrice||'—'}</span>
+                    <span style={{color:'#555870',fontSize:'12px',textAlign:'center',
+                      transform:isExp?'rotate(90deg)':'none',transition:'transform 0.15s'}}>▶</span>
+                  </div>
+                  {/* Accordion */}
+                  {isExp && (
+                    <div style={{borderTop:'1px solid rgba(255,255,255,0.05)',background:'rgba(0,0,0,0.2)',
+                      padding:'10px 14px',maxHeight:'320px',overflowY:'auto'}}>
+                      <div style={{fontSize:'10px',color:'#555870',marginBottom:'8px',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                        Log ({b.lines.length} entries)
+                      </div>
+                      {b.lines.slice(0,100).map((l,i)=>{
+                        const ts = TYPE_STYLES[l.type]||TYPE_STYLES.info
+                        const tag = decisionTag(l.msg)
+                        return (
+                          <div key={i} style={{display:'grid',gridTemplateColumns:'80px 1fr auto',
+                            gap:'8px',padding:'3px 0',borderBottom:'1px solid rgba(255,255,255,0.02)',alignItems:'start'}}>
+                            <span style={{fontFamily:MN,fontSize:'9px',color:'#333650',flexShrink:0}}>{l.ts?.slice(11,19)||''}</span>
+                            <span style={{fontFamily:MN,fontSize:'10px',color:ts.color,wordBreak:'break-all',lineHeight:'1.5'}}>
+                              {l.msg.trim()}
+                            </span>
+                            {tag && <span style={{padding:'1px 5px',borderRadius:'3px',fontSize:'9px',
+                              fontWeight:'700',background:tag.bg,color:tag.color,whiteSpace:'nowrap',flexShrink:0}}>
+                              {tag.label}
+                            </span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
