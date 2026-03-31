@@ -112,6 +112,13 @@ function parsePositionBlocks(lines: LogLine[]): TradeBlock[] {
         blocks[lastSym].isOpen = false
       }
 
+      // Mark as pending if limit order not yet filled
+      if (msg.includes('LIMIT pending')||msg.includes('LIMIT order pending')) {
+        blocks[lastSym].isOpen = true // still active, just pending
+        if (!blocks[lastSym].latestDecision)
+          blocks[lastSym].latestDecision = {label:'⏳ Limit Pending', color:'#f59e0b', bg:'rgba(245,158,11,0.12)'}
+      }
+
       if (line.type==='critical') blocks[lastSym].hasCritical = true
       if (line.type==='error'||line.type==='warning') blocks[lastSym].hasError = true
 
@@ -206,7 +213,7 @@ export default function LogsPage() {
   const load = useCallback(async (log: string, q: string) => {
     setLoading(true); setError('')
     try {
-      const url = `${API}?log=${log}&q=${encodeURIComponent(q)}&limit=500`
+      const url = `${API}?log=${log}&q=${encodeURIComponent(q)}&limit=${log === 'position_monitor' ? 1000 : 500}`
       const r = await fetch(url)
       const data = await r.json()
       if (data.error) { setError(data.error); setLines([]); setGroups([]); return }
@@ -431,7 +438,7 @@ export default function LogsPage() {
                       <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',
                         background:b.isOpen?'rgba(59,130,246,0.12)':'rgba(139,144,168,0.1)',
                         color:b.isOpen?'#60a5fa':'#8b90a8'}}>
-                        {b.isOpen?'Open':'Closed'}
+                        {b.latestDecision?.label==='⏳ Limit Pending'?'Pending':b.isOpen?'Open':'Closed'}
                       </span>
                       {b.latestDecision && (
                         <span style={{padding:'1px 7px',borderRadius:'3px',fontSize:'9px',fontWeight:'700',
