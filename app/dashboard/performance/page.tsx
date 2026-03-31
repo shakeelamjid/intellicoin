@@ -46,17 +46,37 @@ export default function PerformancePage() {
       ? new Date(Date.now() - 30 * 86400000).toISOString()
       : null
 
-    const q = supabase
-      .from('signal_outcomes')
-      .select('*, signals(symbol, scenario_id, signal_rank, direction)')
-      .order('created_at', { ascending: false })
+    async function load() {
+      // Fetch outcomes
+      let q = supabase
+        .from('signal_outcomes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500)
+      if (since) q = q.gte('created_at', since)
+      const { data: outData } = await q
+      if (!outData?.length) { setOutcomes([]); setLoading(false); return }
 
-    if (since) q.gte('created_at', since)
+      // Fetch related signals
+      const signalIds = [...new Set(outData.map((o:any) => o.signal_id).filter(Boolean))]
+      const { data: sigData } = await supabase
+        .from('signals')
+        .select('id, symbol, scenario_id, signal_rank, direction')
+        .in('id', signalIds)
 
-    q.then(({ data }) => {
-      setOutcomes(data || [])
+      // Join manually
+      const sigMap: Record<string, any> = {}
+      for (const s of sigData || []) sigMap[s.id] = s
+
+      const joined = outData.map((o: any) => ({
+        ...o,
+        signals: sigMap[o.signal_id] || null
+      }))
+
+      setOutcomes(joined)
       setLoading(false)
-    })
+    }
+    load()
   }, [period])
 
   // ── Compute stats ─────────────────────────────────────────────────────────
