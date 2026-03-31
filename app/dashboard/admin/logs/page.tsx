@@ -74,34 +74,58 @@ function decisionTag(msg: string): {label:string;color:string;bg:string}|null {
 }
 
 function parsePositionBlocks(lines: LogLine[]): TradeBlock[] {
+  // Lines are newest-first. We process forward and for each symbol
+  // only capture its FIRST (most recent) block — that's the current state.
   const blocks: Record<string,TradeBlock> = {}
+  const finalized = new Set<string>() // symbols whose current state is captured
   let lastSym = ''
+
   for (const line of lines) {
     const msg = line.message || ''
+
+    // New symbol block header
     const symMatch = msg.match(/\[([A-Z0-9]+USDT)\]\s+(long|short)/)
     if (symMatch) {
       const sym = symMatch[1]
       lastSym = sym
-      if (!blocks[sym]) blocks[sym] = {
-        symbol:sym, direction:symMatch[2], isOpen:true,
-        latestPnl:null, latestPrice:null, latestDecision:null,
-        lastSeen:line.ts_pkt||'', lines:[], hasError:false, hasCritical:false,
+      // First time we see this symbol = most recent state
+      if (!blocks[sym]) {
+        blocks[sym] = {
+          symbol:sym, direction:symMatch[2], isOpen:true,
+          latestPnl:null, latestPrice:null, latestDecision:null,
+          lastSeen:line.ts_pkt||'', lines:[], hasError:false, hasCritical:false,
+        }
       }
     }
-    if (lastSym) {
+
+    if (lastSym && blocks[lastSym] && !finalized.has(lastSym)) {
       blocks[lastSym].lines.push({ts:line.ts_pkt||'',msg,type:line.type})
-      blocks[lastSym].lastSeen = line.ts_pkt||blocks[lastSym].lastSeen
+
       const pnl = msg.match(/Live P&L:\s*([+-][\d.]+%)/)
-      if (pnl) blocks[lastSym].latestPnl = pnl[1]
+      if (pnl && !blocks[lastSym].latestPnl) blocks[lastSym].latestPnl = pnl[1]
+
       const px = msg.match(/Mkt price:\s*\$?([\d.]+)/)
-      if (px) blocks[lastSym].latestPrice = '$'+px[1]
-      if (msg.includes('Position CLOSED')||msg.includes('Outcome:')) blocks[lastSym].isOpen = false
+      if (px && !blocks[lastSym].latestPrice) blocks[lastSym].latestPrice = '$'+px[1]
+
+      // Mark as closed if we see closure in this block
+      if (msg.includes('Position CLOSED')||msg.includes('Outcome:')) {
+        blocks[lastSym].isOpen = false
+      }
+
       if (line.type==='critical') blocks[lastSym].hasCritical = true
       if (line.type==='error'||line.type==='warning') blocks[lastSym].hasError = true
+
       const tag = decisionTag(msg)
-      if (tag) blocks[lastSym].latestDecision = tag
+      if (tag && !blocks[lastSym].latestDecision) blocks[lastSym].latestDecision = tag
+
+      // When we hit a monitor separator line, the current symbol block is done
+      if (msg.includes('---') || msg.includes('Position Monitor —')) {
+        finalized.add(lastSym)
+        lastSym = ''
+      }
     }
   }
+
   return Object.values(blocks).sort((a,b)=>a.isOpen===b.isOpen?0:a.isOpen?-1:1)
 }
 
