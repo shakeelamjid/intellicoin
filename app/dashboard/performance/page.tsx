@@ -51,9 +51,9 @@ export default function PerformancePage() {
       let q = supabase
         .from('signal_outcomes')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('resolved_at', { ascending: false })
         .limit(500)
-      if (since) q = q.gte('created_at', since)
+      if (since) q = q.gte('resolved_at', since)
       const { data: outData } = await q
       if (!outData?.length) { setOutcomes([]); setLoading(false); return }
 
@@ -352,7 +352,7 @@ export default function PerformancePage() {
                 <span style={{ fontSize:'12px', fontWeight:'600', color: (o.pnl_pct||0)>=0?'#22c55e':'#ef4444' }}>{o.pnl_pct!=null?pct(o.pnl_pct):'—'}</span>
                 <span style={{ fontSize:'12px', color:'#8b90a8' }}>{o.rr_achieved!=null?o.rr_achieved.toFixed(1)+'x':'—'}</span>
                 <span style={{ fontSize:'12px', color:'#555870' }}>{dur}</span>
-                <span style={{ fontSize:'11px', color:'#555870' }}>{o.created_at ? new Date(o.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span>
+                <span style={{ fontSize:'11px', color:'#555870' }}>{o.resolved_at ? new Date(o.resolved_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'}</span>
               </div>
             )
           })}
