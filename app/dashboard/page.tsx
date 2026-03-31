@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
       const [profile, sigs, cfg, outs, users] = await Promise.all([
         supabase.from('users').select('*').eq('id', au.id).single(),
-        supabase.from('signals').select('*').eq('status','active').order('created_at',{ascending:false}).limit(10),
+        supabase.from('signals').select('*').eq('status','active').neq('direction','watch').order('created_at',{ascending:false}).limit(10),
         supabase.from('scanner_config').select('*').single(),
         supabase.from('signal_outcomes').select('outcome, pnl_pct, created_at')
           .gte('created_at', new Date(Date.now() - 7*86400000).toISOString()),
