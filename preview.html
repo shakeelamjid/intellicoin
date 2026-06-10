@@ -1,0 +1,214 @@
+<!-- ============================================================
+     INTELLICOIN — storefront preview (exotic dark / iris-obsidian)
+     Sidebar pins the flagship (PineSieve) by name · Exclusive shelf
+     leads with a featured flagship card · then Tools · then Guides.
+     ============================================================ -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0b0a14; --panel:#161320; --panel2:#1d1a2b; --tile:#15131f; --side:#0d0b16; --topbar:rgba(13,11,22,.8);
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --accent:#7b6cff; --accent-bright:#a394ff; --accent-tint:rgba(123,108,255,.16); --accent-glow:rgba(123,108,255,.4);
+    --ok:#2ee6a6; --ok-tint:rgba(46,230,166,.14); --warn:#f5b740; --warn-tint:rgba(245,183,64,.16); --danger:#fb7185; --link:#5b8cff;
+    --tx:#ecebf5; --tx2:#b3b0c8; --tx3:#817da0; --tx4:#585577;
+    --r:14px;
+    --f-body:"Inter",system-ui,sans-serif; --f-display:"Outfit",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,monospace;
+    --side-w:252px; --fs-body:1.0625rem;
+  }
+  *{box-sizing:border-box} html{font-size:16px}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--f-body);font-size:var(--fs-body);letter-spacing:-.011em;-webkit-font-smoothing:antialiased;line-height:1.55}
+  a{color:inherit;text-decoration:none}
+  .app{display:grid;grid-template-columns:var(--side-w) 1fr;min-height:100vh}
+  @media(max-width:880px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+
+  /* sidebar */
+  .sidebar{background:var(--side);border-right:1px solid var(--line);padding:26px 18px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:11px;padding:0 8px 4px;margin-bottom:26px}
+  .brand .sk{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#5b8cff);display:grid;place-items:center;color:#fff;font-family:var(--f-mono);font-size:14px}
+  .brand .nm{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:-.01em} .brand .nm b{color:var(--accent-bright)}
+  /* flagship pin */
+  .pin{display:flex;align-items:center;gap:12px;padding:13px 13px;border-radius:13px;margin-bottom:8px;
+       background:linear-gradient(135deg,rgba(123,108,255,.22),rgba(91,140,255,.12));border:1px solid rgba(123,108,255,.4)}
+  .pin .pic{width:34px;height:34px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--accent),#5b8cff);display:grid;place-items:center;color:#fff;font-family:var(--f-mono);font-size:13px;box-shadow:0 6px 16px rgba(0,0,0,.4)}
+  .pin .t{display:flex;flex-direction:column;line-height:1.2;min-width:0}
+  .pin .t b{font-family:var(--f-display);font-weight:700;font-size:.98rem;color:#fff}
+  .pin .t small{font-size:.68rem;color:var(--accent-bright);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .pin .lk{margin-left:auto;color:var(--accent-bright)}
+  .seclabel{font-size:.66rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--tx4);padding:6px 12px;margin:12px 0 4px}
+  .side-nav{display:flex;flex-direction:column;gap:3px}
+  .side-nav a{display:flex;align-items:center;gap:13px;padding:11px 12px;border-radius:11px;color:var(--tx2);font-weight:500;font-size:.96rem}
+  .side-nav a .ico{width:8px;height:8px;border-radius:2px;flex:none;background:currentColor;opacity:.5}
+  .side-nav a .cnt{margin-left:auto;font-family:var(--f-mono);font-size:.72rem;color:var(--tx4);background:rgba(255,255,255,.05);border-radius:999px;padding:2px 8px}
+  .side-nav a:hover{background:rgba(255,255,255,.04);color:var(--tx)}
+  .side-nav a.on{background:var(--accent-tint);color:#fff}
+  .side-foot{margin-top:auto;padding:18px 10px 0;color:var(--tx4);font-size:.78rem;line-height:1.7}
+  .side-foot a{color:var(--link)}
+
+  /* main */
+  .main{min-width:0;display:flex;flex-direction:column}
+  .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:16px 30px;background:var(--topbar);backdrop-filter:saturate(140%) blur(14px);-webkit-backdrop-filter:saturate(140%) blur(14px);border-bottom:1px solid var(--line)}
+  .tsearch{position:relative;flex:1;max-width:640px}
+  .tsearch input{width:100%;background:var(--panel);border:1px solid var(--line-2);border-radius:999px;color:var(--tx);font-family:var(--f-body);font-size:.95rem;padding:12px 16px 12px 44px}
+  .tsearch input::placeholder{color:var(--tx4)} .tsearch input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-tint)}
+  .tsearch svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:17px;height:17px;stroke:var(--tx4);fill:none;stroke-width:1.8}
+  .top-r{margin-left:auto;display:flex;align-items:center;gap:12px}
+  .lang{color:var(--tx3);font-size:.9rem;font-weight:600}
+  .btn{font-family:var(--f-body);font-weight:600;font-size:.92rem;border-radius:999px;padding:10px 20px;cursor:pointer;border:1px solid transparent}
+  .btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 16px var(--accent-glow)} .btn-ghost{background:transparent;color:var(--tx2);border-color:var(--line-2)}
+  .content{padding:26px 30px 60px;max-width:1180px} @media(max-width:600px){.content,.topbar{padding-left:18px;padding-right:18px}}
+
+  /* hero */
+  .hero{position:relative;border-radius:20px;overflow:hidden;border:1px solid rgba(123,108,255,.3);padding:46px 44px;min-height:236px;display:flex;flex-direction:column;justify-content:center;
+        background:radial-gradient(120% 140% at 85% 10%,rgba(123,108,255,.5),transparent 55%),linear-gradient(120deg,#241c3e,#141127 60%)}
+  .hero .kicker{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;color:var(--accent-bright);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .hero h1{font-family:var(--f-display);font-weight:700;font-size:clamp(1.9rem,3.2vw,2.6rem);line-height:1.08;letter-spacing:-.025em;margin:0 0 10px;max-width:20ch}
+  .hero h1 .pn{color:var(--accent-bright)}
+  .hero p{color:var(--tx2);font-size:1.05rem;max-width:54ch;margin:0 0 22px}
+  .hero .glyphs{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:120px;opacity:.12;font-family:var(--f-mono)}
+
+  /* shelf */
+  .shelf{margin-top:38px}
+  .shelf-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .shelf-head h2{font-family:var(--f-display);font-weight:700;font-size:1.5rem;letter-spacing:-.02em;margin:0;display:flex;align-items:center;gap:10px}
+  .shelf-head .lk{color:var(--accent-bright);display:inline-flex}
+  .shelf-head a{color:var(--link);font-size:.9rem;font-weight:600}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:1080px){.tiles{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:720px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:440px){.tiles{grid-template-columns:1fr}}
+
+  /* featured flagship card (spans 2 cols) */
+  .feature{grid-column:span 2;grid-row:span 1;background:linear-gradient(135deg,rgba(123,108,255,.16),rgba(91,140,255,.06)),var(--tile);
+           border:1px solid rgba(123,108,255,.42);border-radius:18px;padding:24px;display:flex;gap:20px;align-items:center;cursor:pointer;position:relative;box-shadow:0 0 0 1px rgba(123,108,255,.14)}
+  @media(max-width:720px){.feature{grid-column:span 2;flex-direction:column;text-align:center}}
+  @media(max-width:440px){.feature{grid-column:span 1}}
+  .feature .fic{width:78px;height:78px;flex:none;border-radius:18px;background:linear-gradient(135deg,var(--accent),#5b8cff);display:grid;place-items:center;color:#fff;font-family:var(--f-mono);font-size:1.6rem;box-shadow:0 10px 26px rgba(0,0,0,.45)}
+  .feature .fb{min-width:0}
+  .feature .fb .flag{font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+  .feature .fb h3{font-family:var(--f-display);font-weight:700;font-size:1.4rem;margin:0 0 4px;letter-spacing:-.02em}
+  .feature .fb p{color:var(--tx3);font-size:.9rem;margin:0 0 14px;max-width:46ch}
+  .feature .fb .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  @media(max-width:720px){.feature .fb .row{justify-content:center}}
+
+  /* app tile */
+  .tile{background:var(--tile);border:1px solid var(--line);border-radius:var(--r);padding:24px 18px 20px;text-align:center;position:relative;cursor:pointer;transition:border-color .15s,transform .05s}
+  .tile:hover{border-color:var(--line-2);transform:translateY(-2px)}
+  .tile .ic{width:60px;height:60px;border-radius:15px;margin:6px auto 14px;display:grid;place-items:center;font-family:var(--f-mono);font-weight:500;font-size:1.2rem;color:#fff;box-shadow:0 8px 20px rgba(0,0,0,.4)}
+  .tile .nm{font-family:var(--f-display);font-weight:600;font-size:1rem;color:var(--tx);margin-bottom:5px;line-height:1.2}
+  .tile .ver{font-family:var(--f-mono);font-size:.8rem;color:var(--tx3);margin-bottom:8px} .tile .cat{font-size:.82rem;color:var(--tx4)}
+  .badge{position:absolute;top:12px;left:12px;font-size:.66rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:7px}
+  .b-excl{background:var(--warn);color:#1a1206} .b-new{background:var(--ok);color:#04231a} .b-free{background:var(--accent-tint);color:var(--accent-bright)}
+  .corner{position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:999px;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--tx3);font-size:13px}
+  .lockico{position:absolute;top:12px;right:12px;color:var(--tx3)}
+
+  .media{display:grid;grid-template-columns:repeat(3,1fr);gap:14px} @media(max-width:900px){.media{grid-template-columns:1fr}}
+  .mcard{background:var(--tile);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer}
+  .mcard .pic{height:140px;background:linear-gradient(120deg,var(--accent),#2ee6a6);position:relative}
+  .mcard .pic.b{background:linear-gradient(120deg,#5b8cff,#7b6cff)} .mcard .pic.c{background:linear-gradient(120deg,#f5b740,#fb7185)}
+  .mcard .tags{position:absolute;top:12px;left:12px;display:flex;gap:6px}
+  .mcard .tags span{background:rgba(0,0,0,.45);color:#fff;font-size:.66rem;font-weight:600;text-transform:uppercase;padding:4px 8px;border-radius:6px}
+  .mcard .body{padding:16px 18px} .mcard .by{color:var(--tx3);font-size:.8rem;margin-bottom:8px}
+  .mcard h3{font-family:var(--f-display);font-weight:600;font-size:1rem;margin:0 0 6px} .mcard p{color:var(--tx3);font-size:.85rem;margin:0 0 14px;line-height:1.45}
+  .stats{display:flex;gap:16px;color:var(--tx4);font-size:.8rem;font-family:var(--f-mono)}
+  .empty{grid-column:1/-1;text-align:center;color:var(--tx4);font-family:var(--f-mono);font-size:.9rem;padding:36px 0}
+</style>
+
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="#"><span class="sk">◆</span><span class="nm">INTELLI<b>·</b>COIN</span></a>
+
+    <!-- flagship pinned by name -->
+    <a class="pin" href="#">
+      <span class="pic">Ps</span>
+      <span class="t"><b>PineSieve</b><small>Flagship · Exclusive</small></span>
+      <svg class="lk" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>
+    </a>
+
+    <div class="seclabel">Browse</div>
+    <nav class="side-nav">
+      <a class="on" href="#"><span class="ico"></span> Tools <span class="cnt">100+</span></a>
+      <a href="#"><span class="ico"></span> Strategies <span class="cnt">24</span></a>
+      <a href="#"><span class="ico"></span> Indicators <span class="cnt">61</span></a>
+      <a href="#"><span class="ico"></span> Library</a>
+      <a href="#"><span class="ico"></span> Monitors <span class="cnt">8</span></a>
+      <a href="#"><span class="ico"></span> Exchanges</a>
+      <a href="#"><span class="ico"></span> Guides</a>
+    </nav>
+    <div class="side-foot">Exclusive &amp; private tools unlock after <a href="#">sign up</a>.<br><br>Pricing · About · Terms · Contact</div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="tsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg><input id="q" placeholder="Search tools, indicators, strategies…" /></div>
+      <div class="top-r"><span class="lang">EN ▾</span><button class="btn btn-ghost">Sign in</button><button class="btn btn-primary">Go Pro</button></div>
+    </div>
+
+    <div class="content">
+      <div class="hero">
+        <span class="glyphs">{ }</span>
+        <p class="kicker">Flagship · Exclusive tool</p>
+        <h1><span class="pn">PineSieve</span> — turn any indicator or strategy into a market scanner.</h1>
+        <p>Paste Pine, see how much we understood, then scan every coin your way — any exchange, any timeframe.</p>
+        <button class="btn btn-primary" style="align-self:flex-start">Open PineSieve →</button>
+      </div>
+
+      <!-- EXCLUSIVE shelf, led by the flagship -->
+      <div class="shelf">
+        <div class="shelf-head"><h2><svg class="lk" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg> Exclusive tools</h2><a href="#">See all ›</a></div>
+        <div class="tiles" id="exgrid"></div>
+      </div>
+
+      <!-- TOOLS shelf -->
+      <div class="shelf">
+        <div class="shelf-head"><h2>Tools</h2><a href="#">See all ›</a></div>
+        <div class="tiles" id="grid"></div>
+      </div>
+
+      <!-- GUIDES -->
+      <div class="shelf">
+        <div class="shelf-head"><h2>Guides</h2><a href="#">See all ›</a></div>
+        <div class="media">
+          <a class="mcard"><div class="pic"><div class="tags"><span>Editorial</span><span>Pine</span></div></div><div class="body"><div class="by">intellicoin · 17.12.2025</div><h3>Writing your first scanner condition</h3><p>From a plotshape to a market-wide scan in five minutes.</p><div class="stats"><span>★ 4.7</span><span>◇ 26</span><span>◉ 39.7K</span></div></div></a>
+          <a class="mcard"><div class="pic b"><div class="tags"><span>Editorial</span><span>Guide</span></div></div><div class="body"><div class="by">intellicoin · 21.11.2025</div><h3>What "understood %" measures</h3><p>How the compatibility score is built, and when to trust it.</p><div class="stats"><span>★ 4.8</span><span>◇ 42</span><span>◉ 50.7K</span></div></div></a>
+          <a class="mcard"><div class="pic c"><div class="tags"><span>Editorial</span><span>BTC</span></div></div><div class="body"><div class="by">intellicoin · 1.11.2025</div><h3>Aligning alts to BTC's regime</h3><p>Using regime and higher-TF gates without overfitting.</p><div class="stats"><span>★ 4.6</span><span>◇ 11</span><span>◉ 41.8K</span></div></div></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const G=[["#7b6cff","#5b8cff"],["#fb7185","#f5b740"],["#5b8cff","#a394ff"],["#a394ff","#fb7185"],["#f5b740","#fb7185"],["#2ee6a6","#5b8cff"],["#7b6cff","#a394ff"],["#5b8cff","#2ee6a6"],["#f5b740","#7b6cff"],["#2ee6a6","#7b6cff"],["#a394ff","#5b8cff"]];
+  const TOOLS=[
+    {abbr:"Ps",name:"PineSieve",ver:"Exclusive",cat:"Scanner",tier:"exclusive",flag:true,desc:"The flagship. Paste an indicator or strategy and run it across the market your way."},
+    {abbr:"Dv",name:"Divergence scanner",ver:"Exclusive",cat:"Scanner",tier:"exclusive"},
+    {abbr:"Li",name:"Indicator library",ver:"Exclusive",cat:"Library",tier:"exclusive"},
+    {abbr:"Lq",name:"Liquidation heatmap",ver:"Exclusive",cat:"Monitor",tier:"exclusive"},
+    {abbr:"Bt",name:"Strategy backtester",ver:"10 runs/day",cat:"Analysis",tier:"metered"},
+    {abbr:"Tr",name:"Translator",ver:"Free",cat:"Analysis",tier:"free"},
+    {abbr:"Al",name:"Alert builder",ver:"20 alerts",cat:"Builder",tier:"metered",badge:"new"},
+    {abbr:"Mt",name:"Multi-TF confluence",ver:"15 runs/day",cat:"Scanner",tier:"metered"},
+    {abbr:"Br",name:"BTC regime monitor",ver:"Free",cat:"Monitor",tier:"free"},
+    {abbr:"Cm",name:"Correlation matrix",ver:"8 runs/day",cat:"Analysis",tier:"metered"},
+    {abbr:"Fn",name:"Funding scanner",ver:"12 runs/day",cat:"Monitor",tier:"metered",badge:"new"},
+    {abbr:"Vp",name:"Volume profile",ver:"Free",cat:"Analysis",tier:"free"},
+  ];
+  const exgrid=document.getElementById('exgrid'),grid=document.getElementById('grid'),q=document.getElementById('q');
+  function badge(t){if(t.tier==='exclusive')return '<span class="badge b-excl">Exclusive</span>';if(t.badge==='new')return '<span class="badge b-new">New</span>';if(t.tier==='free')return '<span class="badge b-free">Free</span>';return ''}
+  function corner(t){return t.tier==='exclusive'?'<svg class="lockico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>':'<span class="corner">↑</span>'}
+  function tile(t,i){return `<div class="tile">${badge(t)}${corner(t)}<div class="ic" style="background:linear-gradient(135deg,${G[i%G.length][0]},${G[i%G.length][1]})">${t.abbr}</div><div class="nm">${t.name}</div><div class="ver">${t.ver}</div><div class="cat">${t.cat}</div></div>`}
+  function feature(t){return `<div class="feature"><div class="fic">${t.abbr}</div><div class="fb"><div class="flag"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg> Flagship · Exclusive</div><h3>${t.name}</h3><p>${t.desc}</p><div class="row"><button class="btn btn-primary">Open PineSieve →</button><span style="color:var(--tx4);font-size:.84rem;font-family:var(--f-mono)">Scanner</span></div></div></div>`}
+  function render(){
+    const term=q.value.toLowerCase().trim();
+    const match=t=>t.name.toLowerCase().includes(term)||t.cat.toLowerCase().includes(term);
+    const ex=TOOLS.filter(t=>t.tier==='exclusive'&&match(t));
+    const reg=TOOLS.filter(t=>t.tier!=='exclusive'&&match(t));
+    exgrid.innerHTML=ex.length? ex.map((t,i)=>t.flag?feature(t):tile(t,i)).join('') : '<div class="empty">No exclusive tools match.</div>';
+    grid.innerHTML=reg.length? reg.map((t,i)=>tile(t,i+4)).join('') : '<div class="empty">No tools match.</div>';
+  }
+  q.addEventListener('input',render); render();
+</script>
