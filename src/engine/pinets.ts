@@ -32,6 +32,7 @@ function findCallArg(code: string, fn: string): string | null {
   return null;
 }
 const PRIORITY = ["longcondition", "long", "buy", "bull", "bullish", "enterlong", "golong", "signal", "entry"];
+const SHORT_PRIORITY = ["shortcondition", "short", "sell", "bear", "bearish", "entershort", "goshort", "exit"];
 
 export function detectSignal(srcRaw: string): { expr: string | null; via: string | null } {
   const src = stripComments(srcRaw);
@@ -51,6 +52,32 @@ export function detectSignal(srcRaw: string): { expr: string | null; via: string
   for (const p of PRIORITY) { const f = cands.find((c) => c.name.toLowerCase() === p); if (f) return { expr: f.name, via: "variable:" + f.name }; }
   if (cands.length) { const last = cands[cands.length - 1]; return { expr: last.name, via: "variable:" + last.name }; }
   return { expr: null, via: null };
+}
+
+export interface Signals { long: { expr: string; via: string } | null; short: { expr: string; via: string } | null }
+
+/** Detect both a long and (if the script defines one) a short trigger.
+ *  We never invent a short the author didn't write. */
+export function detectSignals(srcRaw: string): Signals {
+  const src = stripComments(srcRaw);
+  const cands: { name: string; rhs: string }[] = [];
+  for (const ln of src.split("\n")) {
+    const m = ln.match(/^(?:\s*)(?:var\s+)?(?:bool\s+)?([A-Za-z_]\w*)\s*(?::=|=)\s*(.+)$/);
+    if (!m) continue; const [, name, rhs] = m;
+    if (/crossover|crossunder|[<>]=?|==|!=|\band\b|\bor\b/.test(rhs) &&
+        !/^(plot|strategy|indicator|alertcondition|hline|bgcolor|fill)\b/.test(rhs.trim()))
+      cands.push({ name, rhs });
+  }
+  const pick = (names: string[]) => {
+    for (const p of names) { const f = cands.find((c) => c.name.toLowerCase() === p); if (f) return { expr: f.name, via: "variable:" + f.name }; }
+    return null;
+  };
+  let long = pick(PRIORITY);
+  const short = pick(SHORT_PRIORITY);
+  if (!long) { const d = detectSignal(srcRaw); long = d.expr ? { expr: d.expr, via: d.via || "detected" } : null; }
+  // avoid long===short
+  if (long && short && long.expr === short.expr) return { long, short: null };
+  return { long, short };
 }
 
 export function detectKind(srcRaw: string): "indicator" | "strategy" | "unknown" {
