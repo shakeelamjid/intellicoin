@@ -87,6 +87,14 @@ export default function ScannerApp() {
       {/* BIG PASTE BOX */}
       <div className="card paste-card">
         <textarea className="ta ta-big" spellCheck={false} value={code} onChange={(e) => { setCode(e.target.value); if (phase !== "paste") setPhase("paste"); }} placeholder="// Paste your TradingView indicator or strategy here (Pine v5 / v6)" aria-label="Pine source" />
+        <details className="howcopy">
+          <summary>How do I get an indicator&rsquo;s code from TradingView?</summary>
+          <ol>
+            <li><b>Your own scripts:</b> open the chart → Pine Editor (bottom panel) → select all → copy.</li>
+            <li><b>Published open-source scripts:</b> open the script&rsquo;s page on TradingView → scroll to the <b>Source code</b> section → copy. (If the page says &ldquo;invite-only&rdquo; or &ldquo;protected&rdquo;, the author has hidden the source — it can&rsquo;t be copied or converted.)</li>
+            <li><b>From a chart:</b> hover the indicator name → ⋯ → <b>View source</b> (open-source scripts only).</li>
+          </ol>
+        </details>
         <div className="paste-foot">
           <span className="hint">Read fresh on every run — never stored.</span>
           <button className="cta btn-lg" onClick={analyze} disabled={phase === "analyzing"}>
@@ -107,18 +115,6 @@ export default function ScannerApp() {
               </div>
             ))}
             {phase === "analyzing" && <div className="stage wait"><span className="dot spin">◌</span><div className="sl">working…</div></div>}
-          </div>
-        </div>
-      )}
-
-      {/* UNDERSTANDING */}
-      {analysis && (phase === "understood" || phase === "scanning" || phase === "results") && (
-        <div className="card read-card">
-          <h3>What your code says</h3>
-          <p className="bigread">{stages.find((s) => s.id === "read")?.detail}</p>
-          <div className="meters">
-            <div className="meter"><div className="mh"><span className="ml">Understood</span><span className="mv">{analysis.coverage.understoodPct}%</span></div><div className="bar"><i style={{ width: `${analysis.coverage.understoodPct}%` }} /></div></div>
-            <div className="meter"><div className="mh"><span className="ml">Scanner built</span><span className="mv">{analysis.coverage.faithfulnessPct}%</span></div><div className="bar"><i style={{ width: `${analysis.coverage.faithfulnessPct}%` }} /></div></div>
           </div>
         </div>
       )}

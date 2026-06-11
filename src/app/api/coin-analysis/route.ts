@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { activePass } from "@/lib/pass";
+import { requireAdmin } from "@/lib/admin";
 import { fetchKlines } from "@/data/exchanges";
 import { runSignal } from "@/engine/pinets";
 
@@ -13,7 +14,7 @@ function rsi(v: number[], len=14){let g=0,l=0;for(let i=1;i<=len;i++){const d=v[
 export async function POST(req: Request) {
   const { code, expr, symbol, tf, exchange } = await req.json().catch(() => ({}));
   if (!symbol) return NextResponse.json({ error: "Missing symbol" }, { status: 400 });
-  const pass = await activePass();
+  const pass = (await activePass()) || ((await requireAdmin()) ? { id: "admin" } : null);
 
   // free tier: price context only
   const candles = await fetchKlines(exchange || "Binance", symbol, tf || "4h", 220);

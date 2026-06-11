@@ -3,6 +3,7 @@ import { getIdentity, codeHash } from "@/lib/identity";
 import { getSettings } from "@/db/init";
 import { db } from "@/db/sql";
 import { activePass } from "@/lib/pass";
+import { requireAdmin } from "@/lib/admin";
 import { FP_COOKIE } from "@/lib/session";
 import { detectSignals } from "@/engine/pinets";
 import { runScan } from "@/engine/scanner";
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   const exchange: string = body.exchange || "Binance";
   const tf: string = body.timeframe || "4h";
   const filters = body.filters || {};
-  const pass = await activePass();
+  const pass = (await activePass()) || ((await requireAdmin()) ? { id: "admin", type: "ADMIN", exp: Date.now() + 86400000 } : null);
   const { id, fp } = await getIdentity();
   const s = await getSettings();
 

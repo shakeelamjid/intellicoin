@@ -3,12 +3,13 @@ import { getIdentity } from "@/lib/identity";
 import { getSettings } from "@/db/init";
 import { db } from "@/db/sql";
 import { activePass } from "@/lib/pass";
+import { requireAdmin } from "@/lib/admin";
 import { FP_COOKIE } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const pass = await activePass();
+  const pass = (await activePass()) || ((await requireAdmin()) ? { id: "admin", type: "ADMIN", exp: Date.now() + 86400000 } : null);
   const { id, fp } = await getIdentity();
   const settings = await getSettings();
   let remaining = settings.free_scan_limit;
